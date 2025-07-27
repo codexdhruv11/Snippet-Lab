@@ -13,13 +13,64 @@
 - **⚡ Real-time Execution**: Instant code execution using Piston API
 - **🤝 Social Coding**: Share snippets, comments, and star system
 
----
-
 ## 🏗️ System Architecture
 
 ### High-Level Architecture Overview
 
 The application follows a modern microservices-inspired architecture with clear separation of concerns:
+
+```mermaid
+sequenceDiagram
+    participant User as 👤 User
+    participant Frontend as 🌐 Next.js Frontend
+    participant Backend as ⚙️ Express.js API
+    participant DB as 🗄️ MongoDB
+    participant Piston as 🔧 Piston API
+    participant Auth as 🔐 JWT Auth
+
+    Note over User, Auth: User Authentication Flow
+    User->>Frontend: Access Application
+    Frontend->>Backend: Request CSRF Token
+    Backend-->>Frontend: Return CSRF Token
+    User->>Frontend: Login/Register
+    Frontend->>Backend: POST /api/auth/login
+    Backend->>DB: Validate Credentials
+    DB-->>Backend: User Data
+    Backend->>Auth: Generate JWT Token
+    Auth-->>Backend: JWT Token
+    Backend-->>Frontend: Token + User Data
+    Frontend->>Frontend: Store Token in State
+
+    Note over User, Piston: Code Editor & Execution Flow
+    User->>Frontend: Open Code Editor
+    Frontend->>Frontend: Load Monaco Editor
+    User->>Frontend: Write/Edit Code
+    User->>Frontend: Execute Code
+    Frontend->>Backend: POST /api/executions
+    Backend->>Backend: Validate Request & Rate Limit
+    Backend->>Piston: Execute Code Request
+    Piston-->>Backend: Execution Result
+    Backend->>DB: Save Execution History
+    Backend-->>Frontend: Execution Response
+    Frontend->>Frontend: Display Results
+
+    Note over User, DB: Snippet Management Flow
+    User->>Frontend: Create Snippet
+    Frontend->>Backend: POST /api/snippets
+    Backend->>Backend: Validate & Sanitize
+    Backend->>DB: Save Snippet
+    DB-->>Backend: Snippet Created
+    Backend-->>Frontend: Success Response
+    Frontend->>Frontend: Update UI
+
+    Note over User, DB: Social Features Flow
+    User->>Frontend: Star/Comment Snippet
+    Frontend->>Backend: POST /api/stars or /api/comments
+    Backend->>DB: Update Star/Comment
+    DB-->>Backend: Updated Data
+    Backend-->>Frontend: Success Response
+    Frontend->>Frontend: Update UI State
+```
 
 **Architecture Components:**
 
@@ -33,13 +84,31 @@ The application follows a modern microservices-inspired architecture with clear 
 
 #### Frontend Technologies
 
-TechnologyVersionPurposeImplementation Details**Next.js**14.0.3React frameworkApp Router, SSR, optimized bundling**React**18.2.0UI libraryHooks, Context, Suspense**TypeScript**5.3.2Type safetyStrict mode, comprehensive typing**TailwindCSS**3.3.5StylingCustom design system, responsive**Monaco Editor**4.6.0Code editorVS Code experience, syntax highlighting**Zustand**4.4.6State managementLightweight, persistent stores**Framer Motion**10.16.5AnimationsSmooth transitions, micro-interactions**React Query**5.8.4Server stateCaching, synchronization, optimistic updates**Radix UI**VariousUI componentsAccessible, unstyled primitives
+| Technology | Version | Purpose | Implementation Details |
+|------------|---------|---------|------------------------|
+| **Next.js** | 14.0.3 | React framework | App Router, SSR, optimized bundling |
+| **React** | 18.2.0 | UI library | Hooks, Context, Suspense |
+| **TypeScript** | 5.3.2 | Type safety | Strict mode, comprehensive typing |
+| **TailwindCSS** | 3.3.5 | Styling | Custom design system, responsive |
+| **Monaco Editor** | 4.6.0 | Code editor | VS Code experience, syntax highlighting |
+| **Zustand** | 4.4.6 | State management | Lightweight, persistent stores |
+| **Framer Motion** | 10.16.5 | Animations | Smooth transitions, micro-interactions |
+| **React Query** | 5.8.4 | Server state | Caching, synchronization, optimistic updates |
+| **Radix UI** | Various | UI components | Accessible, unstyled primitives |
 
 #### Backend Technologies
 
-TechnologyVersionPurposeImplementation Details**Node.js**≥18.0.0RuntimeES modules, async/await**Express.js**4.21.2Web frameworkMiddleware-based, RESTful APIs**TypeScript**5.3.3Type safetyStrict configuration, interfaces**MongoDB**8.0.3DatabaseDocument-based, flexible schemas**Mongoose**8.0.3ODMSchema validation, middleware**JWT**9.0.2AuthenticationStateless, secure tokens**Helmet**7.1.0SecurityComprehensive security headers**Winston**3.11.0LoggingStructured logging, multiple transports**Bcrypt**5.1.1Password hashingSalt rounds: 12, secure hashing
-
----
+| Technology | Version | Purpose | Implementation Details |
+|------------|---------|---------|------------------------|
+| **Node.js** | ≥18.0.0 | Runtime | ES modules, async/await |
+| **Express.js** | 4.21.2 | Web framework | Middleware-based, RESTful APIs |
+| **TypeScript** | 5.3.3 | Type safety | Strict configuration, interfaces |
+| **MongoDB** | 8.0.3 | Database | Document-based, flexible schemas |
+| **Mongoose** | 8.0.3 | ODM | Schema validation, middleware |
+| **JWT** | 9.0.2 | Authentication | Stateless, secure tokens |
+| **Helmet** | 7.1.0 | Security | Comprehensive security headers |
+| **Winston** | 3.11.0 | Logging | Structured logging, multiple transports |
+| **Bcrypt** | 5.1.1 | Password hashing | Salt rounds: 12, secure hashing |
 
 ## 📊 Database Architecture & Schema Design
 
@@ -63,10 +132,10 @@ interface IUser extends Document {
   sessionTokens: string[];    // Active session management
   
   // Methods
-  comparePassword(password: string): Promise<boolean>;
+  comparePassword(password: string): Promise;
   isLocked(): boolean;
-  incLoginAttempts(): Promise<void>;
-  resetLoginAttempts(): Promise<void>;
+  incLoginAttempts(): Promise;
+  resetLoginAttempts(): Promise;
 }
 ```
 
@@ -158,8 +227,6 @@ executionSchema.index({ userId: 1, createdAt: -1 });
 executionSchema.index({ language: 1, createdAt: -1 });
 ```
 
----
-
 ## 🔐 Security Architecture
 
 ### Multi-Layer Security Implementation
@@ -223,8 +290,6 @@ const RATE_LIMITS = {
 - **Mongoose Validation**: Schema-level data validation
 - **File Size Limits**: Code snippets max 50KB
 
----
-
 ## 🎯 Core Features Deep Dive
 
 ### 1. Advanced Code Editor
@@ -269,8 +334,6 @@ const RATE_LIMITS = {
 - **Accessibility**: Screen reader support, keyboard navigation
 - **Performance**: Optimized for low-bandwidth connections
 - **PWA Ready**: Service worker implementation (future)
-
----
 
 ## 🚀 Deployment & Infrastructure
 
@@ -330,8 +393,6 @@ PISTON_API_URL=https://emkc.org/api/v2/piston/execute
 5. **Deployment**: Zero-downtime deployment to Render
 6. **Health Verification**: Automated service health checks
 7. **Rollback**: Automatic rollback on deployment failure
-
----
 
 ## 📡 API Documentation
 
@@ -409,8 +470,6 @@ GET  /api/stars/snippets/:id/stars/stats    // Star analytics
 }
 ```
 
----
-
 ## 🔧 Development Environment Setup
 
 ### Prerequisites & Installation
@@ -484,8 +543,6 @@ npm run lint         # ESLint checking
 npm run typecheck    # TypeScript checking
 ```
 
----
-
 ## 🧪 Testing Strategy & Quality Assurance
 
 ### Comprehensive Testing Approach
@@ -543,8 +600,6 @@ npm test                    # Jest + React Testing Library
 npm run test:watch          # Watch mode
 npm run test:e2e           # Playwright E2E tests
 ```
-
----
 
 ## 📈 Performance Optimization
 
@@ -622,8 +677,6 @@ const getSnippets = async (filters) => {
 - **Field Selection**: Return only required fields
 - **Caching Headers**: Appropriate cache headers for different endpoints
 
----
-
 ## 🔮 Future Roadmap & Enhancements
 
 ### Short-term Enhancements (Next 3 months)
@@ -681,8 +734,6 @@ const getSnippets = async (filters) => {
 - **Desktop Application**: Electron-based desktop app
 - **Browser Extension**: Quick snippet access
 - **API Marketplace**: Third-party integrations
-
----
 
 ## 🐛 Troubleshooting & Support
 
@@ -795,33 +846,40 @@ app.use((req, res, next) => {
 5. **Documentation**: Update relevant documentation
 6. **Pull Request**: Detailed description with examples
 
----
-
 ## 📊 Project Metrics & Analytics
 
 ### Codebase Statistics
 
 - **Total Files**: 150+ TypeScript/JavaScript files
-- **Lines of Code**: \~20,000 lines
+- **Lines of Code**: ~20,000 lines
 - **Test Coverage**: 85%+ backend, 80%+ frontend
 - **Dependencies**: 80+ production dependencies
-- **Build Size**: Optimized for performance (&lt;2MB initial bundle)
+- **Build Size**: Optimized for performance (<2MB initial bundle)
 - **Performance Score**: 95+ Lighthouse score
 
 ### Feature Completeness Matrix
 
-Feature CategoryStatusCoverageNotes**Authentication**✅ Complete100%JWT, CSRF, account lockout**Code Editor**✅ Complete100%Monaco integration, mobile-optimized**Code Execution**✅ Complete100%10 languages, real-time results**Snippet Management**✅ Complete100%CRUD, search, pagination**Social Features**✅ Complete100%Comments, stars, user profiles**Responsive Design**✅ Complete100%Mobile-first, touch-optimized**Security**✅ Complete100%Comprehensive security measures**Testing**✅ Complete85%Unit, integration, E2E tests**Documentation**✅ Complete100%Comprehensive technical docs**Deployment**✅ Complete100%Production-ready infrastructure
+| Feature Category | Status | Coverage | Notes |
+|------------------|--------|----------|-------|
+| **Authentication** | ✅ Complete | 100% | JWT, CSRF, account lockout |
+| **Code Editor** | ✅ Complete | 100% | Monaco integration, mobile-optimized |
+| **Code Execution** | ✅ Complete | 100% | 10 languages, real-time results |
+| **Snippet Management** | ✅ Complete | 100% | CRUD, search, pagination |
+| **Social Features** | ✅ Complete | 100% | Comments, stars, user profiles |
+| **Responsive Design** | ✅ Complete | 100% | Mobile-first, touch-optimized |
+| **Security** | ✅ Complete | 100% | Comprehensive security measures |
+| **Testing** | ✅ Complete | 85% | Unit, integration, E2E tests |
+| **Documentation** | ✅ Complete | 100% | Comprehensive technical docs |
+| **Deployment** | ✅ Complete | 100% | Production-ready infrastructure |
 
 ### Performance Benchmarks
 
-- **Page Load Time**: &lt;2 seconds (3G connection)
-- **Code Execution**: &lt;3 seconds average
-- **API Response Time**: &lt;200ms average
-- **Database Query Time**: &lt;50ms average
+- **Page Load Time**: <2 seconds (3G connection)
+- **Code Execution**: <3 seconds average
+- **API Response Time**: <200ms average
+- **Database Query Time**: <50ms average
 - **Bundle Size**: 1.8MB initial, 500KB subsequent pages
 - **Lighthouse Score**: 95+ (Performance, Accessibility, Best Practices, SEO)
-
----
 
 ## 🎉 Conclusion
 
@@ -837,60 +895,5 @@ The project demonstrates best practices in:
 - **Production deployment and monitoring**
 - **Performance optimization techniques**
 - **Accessibility and responsive design**
-
-sequenceDiagram
-
-
-    undefined
-    
-    participant User as 👤 User
-    participant Frontend as 🌐 Next.js Frontend
-    participant Backend as ⚙️ Express.js API
-    participant DB as 🗄️ MongoDB
-    participant Piston as 🔧 Piston API
-    participant Auth as 🔐 JWT Auth
-
-    Note over User, Auth: User Authentication Flow
-    User->>Frontend: Access Application
-    Frontend->>Backend: Request CSRF Token
-    Backend-->>Frontend: Return CSRF Token
-    User->>Frontend: Login/Register
-    Frontend->>Backend: POST /api/auth/login
-    Backend->>DB: Validate Credentials
-    DB-->>Backend: User Data
-    Backend->>Auth: Generate JWT Token
-    Auth-->>Backend: JWT Token
-    Backend-->>Frontend: Token + User Data
-    Frontend->>Frontend: Store Token in State
-
-    Note over User, Piston: Code Editor & Execution Flow
-    User->>Frontend: Open Code Editor
-    Frontend->>Frontend: Load Monaco Editor
-    User->>Frontend: Write/Edit Code
-    User->>Frontend: Execute Code
-    Frontend->>Backend: POST /api/executions
-    Backend->>Backend: Validate Request & Rate Limit
-    Backend->>Piston: Execute Code Request
-    Piston-->>Backend: Execution Result
-    Backend->>DB: Save Execution History
-    Backend-->>Frontend: Execution Response
-    Frontend->>Frontend: Display Results
-
-    Note over User, DB: Snippet Management Flow
-    User->>Frontend: Create Snippet
-    Frontend->>Backend: POST /api/snippets
-    Backend->>Backend: Validate & Sanitize
-    Backend->>DB: Save Snippet
-    DB-->>Backend: Snippet Created
-    Backend-->>Frontend: Success Response
-    Frontend->>Frontend: Update UI
-
-    Note over User, DB: Social Features Flow
-    User->>Frontend: Star/Comment Snippet
-    Frontend->>Backend: POST /api/stars or /api/comments
-    Backend->>DB: Update Star/Comment
-    DB-->>Backend: Updated Data
-    Backend-->>Frontend: Success Response
-    Frontend->>Frontend: Update UI State
 
 Whether you're looking to understand modern web development practices, implement similar features, or contribute to the project, this documentation provides the comprehensive technical foundation needed to work effectively with the SnippetLab codebase.
