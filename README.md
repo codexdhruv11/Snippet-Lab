@@ -837,8 +837,9 @@ The project demonstrates best practices in:
 - **Production deployment and monitoring**
 - **Performance optimization techniques**
 - **Accessibility and responsive design**
-'''
+
 sequenceDiagram
+
     participant User as 👤 User
     participant Frontend as 🌐 Next.js Frontend
     participant Backend as ⚙️ Express.js API
@@ -889,5 +890,4 @@ sequenceDiagram
     Backend-->>Frontend: Success Response
     Frontend->>Frontend: Update UI State
 
-'''
 Whether you're looking to understand modern web development practices, implement similar features, or contribute to the project, this documentation provides the comprehensive technical foundation needed to work effectively with the SnippetLab codebase.
