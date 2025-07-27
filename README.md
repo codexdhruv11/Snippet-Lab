@@ -840,6 +840,9 @@ The project demonstrates best practices in:
 
 sequenceDiagram
 
+
+    undefined
+    
     participant User as 👤 User
     participant Frontend as 🌐 Next.js Frontend
     participant Backend as ⚙️ Express.js API
