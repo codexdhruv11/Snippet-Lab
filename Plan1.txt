@@ -1,0 +1,172 @@
+I have created the following plan after thorough exploration and analysis of the codebase. Follow the below plan verbatim. Trust the files and references. Do not re-verify what's written in the plan. Explore only when absolutely necessary. First implement all the proposed file changes and then I'll review all the changes together at the end.
+
+### Observations
+
+The codebase has a well-structured MERN stack application with comprehensive backend follow system already implemented. The frontend uses Next.js 13 with Shadcn/ui components, React Query for data fetching, and Zustand for state management. The current profile page shows only the user's own profile with execution stats and snippets. Missing components include follow/unfollow functionality, followers/following lists, user search, and public user profiles. The existing patterns for API integration, component structure, and state management provide a solid foundation to build upon.
+
+### Approach
+
+I'll implement a comprehensive follow system by extending the existing API layer with follow-related endpoints, creating reusable follow components using Shadcn/ui, adding public user profile pages, implementing followers/following lists with pagination, and creating user search functionality. The implementation will follow existing patterns for consistency, use React Query for efficient data fetching and caching, integrate seamlessly with the current auth store, and provide responsive design with proper loading and error states. I'll prioritize reusability and maintainability while keeping the UI intuitive and performant.
+
+### Reasoning
+
+I explored the repository structure to understand the codebase organization. I examined the current profile page to see existing patterns and functionality, reviewed the API client to understand data fetching patterns, analyzed the auth store to understand user state management, checked available Shadcn/ui components and their usage patterns, reviewed the existing search modal to understand search implementation patterns, and examined constants and type definitions to understand API organization. This gave me a comprehensive understanding of how to implement the follow system following existing conventions and maintaining consistency with the current architecture.
+
+## Mermaid Diagram
+
+sequenceDiagram
+    participant User
+    participant ProfilePage
+    participant FollowButton
+    participant FollowAPI
+    participant FollowersModal
+    participant UserSearch
+    participant DiscoverPage
+
+    Note over User,DiscoverPage: Follow/Unfollow Flow
+    User->>ProfilePage: Visit /users/:id
+    ProfilePage->>FollowAPI: getUserProfile(id)
+    FollowAPI-->>ProfilePage: {user, followerCount, isFollowing}
+    ProfilePage->>FollowButton: Render with follow state
+    User->>FollowButton: Click Follow
+    FollowButton->>FollowAPI: toggleFollow(userId)
+    FollowAPI-->>FollowButton: {isFollowing: true, followerCount: 45}
+    FollowButton->>ProfilePage: Invalidate profile queries
+    ProfilePage->>ProfilePage: Update counts display
+
+    Note over User,DiscoverPage: Followers/Following Lists
+    User->>ProfilePage: Click "45 followers"
+    ProfilePage->>FollowersModal: Open with userId, tab="followers"
+    FollowersModal->>FollowAPI: getFollowers(userId, page=1)
+    FollowAPI-->>FollowersModal: {data: [users], pagination}
+    FollowersModal->>FollowersModal: Render UserList with UserCards
+    User->>FollowersModal: Click "Load More"
+    FollowersModal->>FollowAPI: getFollowers(userId, page=2)
+    FollowAPI-->>FollowersModal: More users
+
+    Note over User,DiscoverPage: User Search & Discovery
+    User->>UserSearch: Open search modal
+    User->>UserSearch: Type "john"
+    UserSearch->>FollowAPI: searchUsers("john", page=1)
+    FollowAPI-->>UserSearch: {data: [matching users]}
+    UserSearch->>UserSearch: Display UserCards with FollowButtons
+    User->>DiscoverPage: Navigate to /discover
+    DiscoverPage->>FollowAPI: getPopularUsers(), getRecentUsers()
+    FollowAPI-->>DiscoverPage: User lists for discovery
+
+## Proposed File Changes
+
+### code-craft-frontend\src\lib\constants.ts(MODIFY)
+
+Add follow-related API endpoints to the API_ENDPOINTS object. Include FOLLOWS section with endpoints for toggle follow (`/users/:id/follow`), get followers (`/users/:id/followers`), get following (`/users/:id/following`), get follower count (`/users/:id/followers/count`), get following count (`/users/:id/following/count`), and check follow status (`/users/:id/follow/me`). Add USER_SEARCH section with search endpoint (`/users/search`). Add USER_PROFILE section with public profile endpoint (`/users/:id/profile`). Update API_LIMITS to include follow-related limits like MAX_USERS_PER_PAGE: 20 for pagination.
+
+### code-craft-frontend\src\types\api.ts(MODIFY)
+
+Add follow-related TypeScript interfaces. Create FollowStatus interface with `isFollowing: boolean` and `followerCount: number`. Add UserProfile interface extending User with `followerCount: number`, `followingCount: number`, and optional `isFollowing: boolean` for authenticated users. Create UserSearchResult interface for search results with basic user info. Add FollowToggleResponse interface with `isFollowing: boolean` and `followerCount: number`. These interfaces will ensure type safety across the follow system components.
+
+### code-craft-frontend\src\lib\api.ts(MODIFY)
+
+Add comprehensive follow-related API functions. Create followApi object with `toggleFollow(userId)` for follow/unfollow actions, `getFollowers(userId, page, limit)` for paginated followers list, `getFollowing(userId, page, limit)` for paginated following list, `getFollowerCount(userId)` and `getFollowingCount(userId)` for individual counts, and `checkFollowStatus(userId)` to check if current user follows target user. Add userSearchApi object with `searchUsers(query, page, limit)` for user search functionality. Add userProfileApi object with `getUserProfile(userId)` for fetching public user profiles. All functions should use the existing apiClient and follow the same error handling patterns as existing API functions.
+
+### code-craft-frontend\src\components\ui\avatar.tsx(NEW)
+
+Create a Shadcn/ui Avatar component using `npx shadcn-ui@latest add avatar`. This component will be used throughout the follow system for displaying user profile pictures. The avatar should support fallback initials when no image is provided, different sizes (sm, md, lg), and proper accessibility attributes. Follow the standard Shadcn/ui patterns for styling and variants.
+
+### code-craft-frontend\src\components\ui\badge.tsx(NEW)
+
+Create a Shadcn/ui Badge component using `npx shadcn-ui@latest add badge`. This component will be used for displaying follower/following counts and status indicators. The badge should support different variants (default, secondary, destructive, outline) and sizes. Follow the standard Shadcn/ui patterns for styling and accessibility.
+
+### code-craft-frontend\src\components\ui\tabs.tsx(NEW)
+
+Create a Shadcn/ui Tabs component using `npx shadcn-ui@latest add tabs`. This component will be used in the followers/following modal to switch between the two lists. The tabs should support keyboard navigation, proper ARIA attributes, and smooth transitions. Follow the standard Shadcn/ui patterns for styling and behavior.
+
+### code-craft-frontend\src\components\user\FollowButton.tsx(NEW)
+
+References: 
+
+- code-craft-frontend\src\lib\api.ts(MODIFY)
+- code-craft-frontend\src\stores\authStore.ts
+
+Create a reusable FollowButton component that handles follow/unfollow functionality. The component should accept `userId` and `initialFollowState` props, use React Query to manage follow status and mutations, integrate with the auth store to get current user info, show different states (Follow, Following, Unfollow on hover), handle loading states with spinner, show proper error messages using toast, and invalidate relevant queries after successful toggle. Use Shadcn Button component with appropriate variants (default for Follow, secondary for Following). Include proper accessibility attributes and keyboard support.
+
+### code-craft-frontend\src\components\user\UserCard.tsx(NEW)
+
+References: 
+
+- code-craft-frontend\src\components\ui\avatar.tsx(NEW)
+- code-craft-frontend\src\components\ui\badge.tsx(NEW)
+- code-craft-frontend\src\components\user\FollowButton.tsx(NEW)
+
+Create a UserCard component for displaying users in lists and search results. The component should accept a `user` prop with user data, display user avatar using the new Avatar component, show user name and bio (truncated), include follower count badge, integrate FollowButton for authenticated users, support click navigation to user profile, and use Card component for consistent styling. The card should be responsive and work well in grid layouts. Include hover effects and proper accessibility attributes.
+
+### code-craft-frontend\src\components\user\UserList.tsx(NEW)
+
+References: 
+
+- code-craft-frontend\src\components\user\UserCard.tsx(NEW)
+- code-craft-frontend\src\components\ui\scroll-area.tsx
+
+Create a UserList component for displaying paginated lists of users (followers/following). The component should accept `users` array, `isLoading`, `hasMore`, and `onLoadMore` props, use ScrollArea for smooth scrolling, display users in a responsive grid using UserCard components, show loading skeletons during fetch, include a "Load More" button when `hasMore` is true, handle empty states with appropriate messages, and support infinite scroll as an enhancement. The component should be reusable across different contexts (followers, following, search results).
+
+### code-craft-frontend\src\components\user\FollowersModal.tsx(NEW)
+
+References: 
+
+- code-craft-frontend\src\components\ui\dialog.tsx
+- code-craft-frontend\src\components\ui\tabs.tsx(NEW)
+- code-craft-frontend\src\components\user\UserList.tsx(NEW)
+
+Create a FollowersModal component for displaying followers and following lists in a modal dialog. The component should accept `isOpen`, `onClose`, `userId`, and `initialTab` props, use Dialog component for modal functionality, implement Tabs for switching between Followers and Following, use React Query for data fetching with pagination, integrate UserList component for displaying users, handle loading and error states appropriately, support search within the lists, and include proper modal accessibility. The modal should be responsive and work well on mobile devices.
+
+### code-craft-frontend\src\components\user\UserSearchModal.tsx(NEW)
+
+References: 
+
+- code-craft-frontend\src\components\search\SearchModal.tsx
+- code-craft-frontend\src\components\user\UserCard.tsx(NEW)
+
+Create a UserSearchModal component for user search and discovery. The component should follow the same pattern as the existing SearchModal, accept `isOpen` and `onClose` props, use Dialog component for modal functionality, implement debounced search input, use React Query for search API calls, display search results using UserCard components in a scrollable list, handle empty states and loading states, support keyboard navigation, and include a "View all results" option that navigates to a dedicated search page. The modal should provide a smooth search experience with proper error handling.
+
+### code-craft-frontend\src\app\users\[id]\page.tsx(NEW)
+
+References: 
+
+- code-craft-frontend\src\app\profile\page.tsx(MODIFY)
+- code-craft-frontend\src\components\user\FollowButton.tsx(NEW)
+- code-craft-frontend\src\components\user\FollowersModal.tsx(NEW)
+
+Create a public user profile page that displays other users' profiles. The component should use the `id` parameter from the route, fetch user profile data using React Query, display user information (name, bio, join date), show follower/following counts as clickable elements that open FollowersModal, include FollowButton for authenticated users (hide for own profile), display user's public snippets in a grid, handle loading states with skeletons, show error states for non-existent users, and redirect to own profile page if viewing self. The page should follow the same layout patterns as the existing profile page but adapted for public viewing.
+
+### code-craft-frontend\src\app\discover\page.tsx(NEW)
+
+References: 
+
+- code-craft-frontend\src\components\user\UserCard.tsx(NEW)
+- code-craft-frontend\src\components\user\UserList.tsx(NEW)
+
+Create a user discovery page for finding and following other users. The page should include a search input for finding users by name, display trending/popular users, show recently joined users, implement pagination for all user lists, use UserCard components for consistent display, include filters for user activity (most followers, most snippets, etc.), handle loading and error states appropriately, and provide a responsive layout that works on all devices. The page should encourage user engagement and help build the community.
+
+### code-craft-frontend\src\app\profile\page.tsx(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\components\user\FollowersModal.tsx(NEW)
+- code-craft-frontend\src\lib\api.ts(MODIFY)
+
+Enhance the existing profile page to include follow-related functionality. Add follower and following count displays as clickable elements that open the FollowersModal, integrate with the enhanced user profile API to fetch counts, add a "Discover Users" button that navigates to the discover page, update the profile information section to show more social stats, ensure the page handles the enhanced user data structure with follower/following counts, and maintain backward compatibility with existing functionality. The enhancements should feel natural and integrated with the current design.
+
+### code-craft-frontend\src\components\layout\Header.tsx(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\components\user\UserSearchModal.tsx(NEW)
+
+Update the header component to include user search functionality. Add a search icon/button that opens the UserSearchModal, integrate the new UserSearchModal component, ensure the search functionality is easily accessible, maintain the existing header layout and functionality, and provide proper responsive behavior for mobile devices. The search feature should be discoverable but not overwhelming in the header design.
+
+### code-craft-frontend\src\components\snippet\SnippetCard.tsx(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\components\user\FollowButton.tsx(NEW)
+
+Update the SnippetCard component to include author profile links and follow functionality. Make the author name clickable to navigate to their profile page (`/users/[id]`), add a small follow button for authenticated users when viewing other users' snippets, ensure the author information is prominently displayed, maintain the existing card layout and functionality, and handle the case where the snippet author is the current user (no follow button). The changes should enhance discoverability without cluttering the card design.
