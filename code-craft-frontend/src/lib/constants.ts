@@ -56,12 +56,12 @@ export const API_ENDPOINTS = {
     STATS: (snippetId: string) => `/snippets/${snippetId}/stars/stats`,
   },
   FOLLOWS: {
-    TOGGLE: (userId: string) => `/users/${userId}/follows`,
+    TOGGLE: (userId: string) => `/users/${userId}/follow`,
     FOLLOWERS: (userId: string) => `/users/${userId}/followers`,
     FOLLOWING: (userId: string) => `/users/${userId}/following`,
     FOLLOWER_COUNT: (userId: string) => `/users/${userId}/followers/count`,
     FOLLOWING_COUNT: (userId: string) => `/users/${userId}/following/count`,
-    CHECK: (userId: string) => `/users/${userId}/follows/me`,
+    CHECK: (userId: string) => `/users/${userId}/follow/me`,
   },
   USER_SEARCH: {
     SEARCH: '/users/search',
