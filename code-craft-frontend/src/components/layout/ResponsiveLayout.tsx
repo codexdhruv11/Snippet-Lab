@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, ReactNode } from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 
 import { useResponsive } from "@/hooks/useResponsive";
@@ -18,15 +18,15 @@ export function ResponsiveLayout({
   showMobileNav = true,
   className,
 }: ResponsiveLayoutProps) {
-  const { breakpoint, isMobile, isTablet } = useResponsive();
+  const { isMobile, isDesktop } = useResponsive();
   const { isSidebarOpen, setSidebarOpen } = useUIStore();
   
   // Close sidebar on mobile/tablet when breakpoint changes
   useEffect(() => {
-    if (breakpoint !== "desktop" && isSidebarOpen) {
+    if (!isDesktop && isSidebarOpen) {
       setSidebarOpen(false);
     }
-  }, [breakpoint, isSidebarOpen, setSidebarOpen]);
+  }, [isDesktop, isSidebarOpen, setSidebarOpen]);
 
   return (
     <div className={cn("min-h-screen flex flex-col", className)}>
@@ -35,7 +35,7 @@ export function ResponsiveLayout({
         <header
           className={cn(
             "sticky top-0 z-40 w-full border-b bg-background",
-            hideHeaderOnMobile && breakpoint === "mobile" && "hidden"
+            hideHeaderOnMobile && isMobile && "hidden"
           )}
         >
           {header}
@@ -44,7 +44,7 @@ export function ResponsiveLayout({
 
       <div className="flex min-h-[calc(100vh-4rem)]">
         {/* Sidebar - Desktop */}
-        {sidebar && breakpoint === "desktop" && (
+        {sidebar && isDesktop && (
           <aside
             className={cn(
               "hidden w-64 flex-shrink-0 border-r bg-card desktop:block",
@@ -56,7 +56,7 @@ export function ResponsiveLayout({
         )}
 
         {/* Sidebar - Mobile/Tablet Overlay */}
-        {sidebar && breakpoint !== "desktop" && isSidebarOpen && (
+        {sidebar && !isDesktop && isSidebarOpen && (
           <>
             {/* Backdrop */}
             <motion.div

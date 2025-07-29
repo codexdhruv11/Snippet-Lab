@@ -1,5 +1,6 @@
-import mongoose, { Document, Schema } from 'mongoose';
-import bcrypt from 'bcrypt';
+import mongoose, { Document, Schema, Model } from 'mongoose';
+import bcrypt from 'bcryptjs';
+import { performanceMonitor } from '../utils/performance-monitor';
 
 export interface IUser extends Document {
   email: string;
@@ -15,6 +16,50 @@ export interface IUser extends Document {
   toJSON(): any;
   comparePassword(password: string): Promise<boolean>;
   _id: mongoose.Types.ObjectId;
+  
+  /**
+   * Virtual Fields - Follow Counts
+   * 
+   * ⚠️  IMPORTANT: These fields are virtual and require explicit population.
+   * They will be undefined unless specifically populated.
+   * 
+   * DECISION MATRIX:
+   * 
+   * ┌─────────────────────┬─────────────────────┬─────────────────────┐
+   * │     USE CASE        │   RECOMMENDED       │      REASON         │
+   * ├─────────────────────┼─────────────────────┼─────────────────────┤
+   * │ Single user + counts│ getUserWithFollows()│ Single query,       │
+   * │                     │                     │ guaranteed results  │
+   * ├─────────────────────┼─────────────────────┼─────────────────────┤
+   * │ Single user profile │ Virtual population  │ Flexible, on-demand │
+   * │ (optional counts)   │ .populate('follower'│                     │
+   * │                     │ Count')             │                     │
+   * ├─────────────────────┼─────────────────────┼─────────────────────┤
+   * │ Multiple users      │ Omit counts OR      │ Avoid N+1 queries   │
+   * │                     │ custom aggregation  │                     │
+   * ├─────────────────────┼─────────────────────┼─────────────────────┤
+   * │ User lists/search   │ Omit counts         │ Performance first   │
+   * └─────────────────────┴─────────────────────┴─────────────────────┘
+   * 
+   * EXAMPLES:
+   * ```typescript
+   * // ✅ Single user with guaranteed counts (RECOMMENDED)
+   * const userWithCounts = await User.getUserWithFollows(userId);
+   * 
+   * // ✅ Single user with optional counts
+   * const user = await User.findById(id)
+   *   .populate('followerCount')
+   *   .populate('followingCount');
+   * 
+   * // ❌ NEVER do this - causes N+1 queries!
+   * const users = await User.find().populate('followerCount');
+   * 
+   * // ✅ Multiple users without counts (fast)
+   * const users = await User.find();
+   * ```
+   */
+  followerCount?: number;
+  followingCount?: number;
 }
 
 export interface IUserMethods {
@@ -29,6 +74,7 @@ export interface IUserMethods {
 export interface IUserStatics {
   findByEmail(email: string): Promise<IUser | null>;
   comparePasswordStatic(password: string, hash: string): Promise<boolean>;
+  getUserWithFollows(userId: string): Promise<any>;
 }
 
 export type UserModel = mongoose.Model<IUser, {}, IUserMethods> & IUserStatics;
@@ -83,10 +129,14 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
   {
     timestamps: true,
     toJSON: {
+      virtuals: true,
       transform: function(doc, ret: Record<string, any>) {
         const { __v, ...rest } = ret;
         return rest;
       },
+    },
+    toObject: {
+      virtuals: true,
     },
   }
 );
@@ -94,6 +144,76 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
 // Indexes
 userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ createdAt: -1 });
+userSchema.index({ name: 'text' }); // Text index for user search
+
+// Virtual fields for follow counts
+// PERFORMANCE WARNING: Virtual fields require additional database queries.
+// They are NOT populated by default to optimize performance.
+//
+// ⚠️ N+1 QUERY WARNING: DO NOT populate these fields when fetching multiple users!
+// Each virtual field population triggers a separate database query per user.
+// For lists of users, this creates N+1 query problems that severely impact performance.
+//
+// Usage patterns:
+// 1. Single user with counts (when needed):
+//    await User.findById(id).populate('followerCount').populate('followingCount')
+//
+// 2. Better performance for single user:
+//    await User.getUserWithFollows(userId) // Uses aggregation, single query
+//
+// 3. Multiple users: NEVER populate virtuals - use custom aggregation instead
+//    ❌ WRONG: await User.find().populate('followerCount') // N+1 queries!
+//    ✅ RIGHT: Use custom aggregation pipeline or omit counts
+//
+// Note: These virtuals will be undefined unless explicitly populated.
+// Consider if you really need the counts before populating them.
+
+// Enhanced performance tracking for virtual fields
+userSchema.virtual('followerCount', {
+  ref: 'Follow',
+  localField: '_id',
+  foreignField: 'followingId',
+  count: true,
+  justOne: false,
+  // Enhanced getter with context-aware performance monitoring
+  get: function(value: number | undefined) {
+    if (process.env.NODE_ENV !== 'production' && process.env.MONITOR_VIRTUAL_FIELDS !== 'false') {
+      // Detect if this is part of a bulk operation
+      const parent = (this as any).parent?.();
+      const isBulkOperation = parent && Array.isArray(parent);
+      const documentCount = isBulkOperation ? parent.length : 1;
+      
+      performanceMonitor.trackVirtualFieldUsage('followerCount', {
+        isBulkOperation,
+        documentCount,
+      });
+    }
+    return value;
+  },
+});
+
+userSchema.virtual('followingCount', {
+  ref: 'Follow',
+  localField: '_id',
+  foreignField: 'followerId',
+  count: true,
+  justOne: false,
+  // Enhanced getter with context-aware performance monitoring
+  get: function(value: number | undefined) {
+    if (process.env.NODE_ENV !== 'production' && process.env.MONITOR_VIRTUAL_FIELDS !== 'false') {
+      // Detect if this is part of a bulk operation
+      const parent = (this as any).parent?.();
+      const isBulkOperation = parent && Array.isArray(parent);
+      const documentCount = isBulkOperation ? parent.length : 1;
+      
+      performanceMonitor.trackVirtualFieldUsage('followingCount', {
+        isBulkOperation,
+        documentCount,
+      });
+    }
+    return value;
+  },
+});
 
 // Account lockout constants
 const LOCK_TIME = 2 * 60 * 60 * 1000; // 2 hours
@@ -180,6 +300,47 @@ userSchema.statics.comparePasswordStatic = async function(password: string, hash
   return bcrypt.compare(password, hash);
 };
 
+// Efficiently fetch user with follow counts using aggregation
+userSchema.statics.getUserWithFollows = async function (userId: string) {
+  // Validate ObjectId before proceeding
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error('Invalid user ID format');
+  }
+
+  const result = await this.aggregate([
+    { $match: { _id: new mongoose.Types.ObjectId(userId) } },
+    {
+      $lookup: {
+        from: 'follows',
+        localField: '_id',
+        foreignField: 'followingId',
+        as: 'followers',
+      },
+    },
+    {
+      $lookup: {
+        from: 'follows',
+        localField: '_id',
+        foreignField: 'followerId',
+        as: 'following',
+      },
+    },
+    {
+      $project: {
+        email: 1,
+        name: 1,
+        bio: 1,      // Include bio field
+        createdAt: 1, // Include createdAt field
+        followerCount: { $size: '$followers' },
+        followingCount: { $size: '$following' },
+      },
+    },
+  ]);
+
+  // Return single user object instead of array
+  return result.length > 0 ? result[0] : null;
+};
+
 // Custom toJSON method
 userSchema.methods.toJSON = function() {
   const userObject = this.toObject();
@@ -188,3 +349,4 @@ userSchema.methods.toJSON = function() {
 };
 
 export const User = mongoose.model<IUser, UserModel>('User', userSchema);
+export const UserModel = User;

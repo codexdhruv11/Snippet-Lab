@@ -17,14 +17,11 @@ import { toast } from "sonner";
 export default function EditorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isMobile, isTablet } = useResponsive();
+  const { isMobile } = useResponsive();
   const { isAuthenticated } = useAuthStore();
-  const { code, language, setCode, setLanguage, clearExecutionResults } = useEditorStore();
+  const { code, language, setCode, setLanguage } = useEditorStore();
   
   const [showExecution, setShowExecution] = useState(!isMobile);
-  const [executionOutput, setExecutionOutput] = useState<string>('');
-  const [executionStatus, setExecutionStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [executionTime, setExecutionTime] = useState<number | null>(null);
   const [hasUserModifiedCode, setHasUserModifiedCode] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   
@@ -82,11 +79,6 @@ export default function EditorPage() {
   const handleLanguageChange = React.useCallback((newLanguage: string) => {
     if (newLanguage !== language) {
       setLanguage(newLanguage);
-      
-      // Clear execution results when switching languages
-      setExecutionOutput('');
-      setExecutionStatus('idle');
-      setExecutionTime(null);
       
       // Only update to new language template if user hasn't modified code or current code is the default template
       const currentTemplate = LANGUAGE_TEMPLATES[language];

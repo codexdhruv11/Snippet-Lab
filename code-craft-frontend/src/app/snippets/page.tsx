@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,16 +12,49 @@ import { LazySnippetCard } from '@/components/lazy/LazySnippetCard';
 import { MagicBentoGrid, MagicBentoContainer } from '@/components/ui/magic-bento';
 import { snippetApi } from '@/lib/api';
 import { useResponsive } from '@/hooks/useResponsive';
+import { TagFilter } from '@/components/snippet/TagFilter';
+import { TagCloud } from '@/components/snippet/TagCloud';
+import { SUPPORTED_LANGUAGES } from '@/lib/constants';
 
 export default function SnippetsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [language, setLanguage] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const { isMobile, isTablet } = useResponsive();
+
+  // Initialize tags from URL parameters
+  useEffect(() => {
+    const tagsParam = searchParams.get('tags');
+    if (tagsParam) {
+      const tagsFromUrl = tagsParam.split(',').filter(tag => tag.trim().length > 0);
+      setSelectedTags(tagsFromUrl);
+    }
+  }, [searchParams]);
+
+  // Update URL when tags change
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (selectedTags.length > 0) {
+      params.set('tags', selectedTags.join(','));
+    } else {
+      params.delete('tags');
+    }
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    router.replace(newUrl, { scroll: false });
+  }, [selectedTags, router, searchParams]);
   
   const { data, isLoading, error } = useQuery({
-    queryKey: ['snippets', page, language, searchQuery],
-    queryFn: () => snippetApi.getSnippets({ page, limit: 12, language, search: searchQuery }),
+    queryKey: ['snippets', page, language, searchQuery, selectedTags],
+    queryFn: () => snippetApi.getSnippets({ 
+      page, 
+      limit: 12, 
+      language, 
+      search: searchQuery,
+      tags: selectedTags.length > 0 ? selectedTags : undefined
+    }),
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -30,6 +64,18 @@ export default function SnippetsPage() {
 
   const handleLoadMore = () => {
     setPage((prev) => prev + 1);
+  };
+
+  const handleTagClick = (tag: string) => {
+    if (!selectedTags.includes(tag)) {
+      setSelectedTags([...selectedTags, tag]);
+      setPage(1); // Reset to first page when filtering
+    }
+  };
+
+  const handleTagsChange = (tags: string[]) => {
+    setSelectedTags(tags);
+    setPage(1); // Reset to first page when filtering
   };
 
   return (
@@ -42,29 +88,34 @@ export default function SnippetsPage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <Card magic glow className="p-4 sticky top-20">
-            <h2 className="text-xl font-semibold mb-4">Filters</h2>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="language" className="block text-sm font-medium mb-1">
-                  Language
-                </label>
-                <select
-                  id="language"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2"
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                >
-                  <option value="">All Languages</option>
-                  <option value="javascript">JavaScript</option>
-                  <option value="typescript">TypeScript</option>
-                  <option value="python">Python</option>
-                  <option value="java">Java</option>
-                  <option value="csharp">C#</option>
-                </select>
+          <div className="space-y-4">
+            <Card magic glow className="p-4 sticky top-20">
+              <h2 className="text-xl font-semibold mb-4">Filters</h2>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="language" className="block text-sm font-medium mb-1">
+                    Language
+                  </label>
+                  <select
+                    id="language"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                  >
+                    <option value="">All Languages</option>
+                    {SUPPORTED_LANGUAGES.map((lang) => (
+                      <option key={lang.id} value={lang.id}>{lang.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+            
+            <TagFilter
+              selectedTags={selectedTags}
+              onTagsChange={handleTagsChange}
+            />
+          </div>
         </motion.div>
 
         {/* Main content */}
@@ -95,6 +146,16 @@ export default function SnippetsPage() {
             </div>
           </form>
 
+          {/* Popular Tags Cloud */}
+          <div className="mb-6">
+            <TagCloud
+              onTagClick={handleTagClick}
+              limit={15}
+              showTitle={true}
+              showRefresh={true}
+            />
+          </div>
+
           {/* Snippets grid */}
           {isLoading ? (
             <div className="text-center py-10">Loading snippets...</div>
@@ -112,7 +173,7 @@ export default function SnippetsPage() {
                 columns={{ mobile: 1, tablet: 2, desktop: 3 }} 
                 stagger="normal"
               >
-                {data?.data?.map((snippet, index) => (
+                {data?.data?.map((snippet) => (
                   <LazySnippetCard key={snippet._id} snippet={snippet} />
                 ))}
               </MagicBentoGrid>

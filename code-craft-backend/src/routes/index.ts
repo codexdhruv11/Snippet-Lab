@@ -5,6 +5,8 @@ import snippetRoutes from './snippetRoutes';
 import commentRoutes from './commentRoutes';
 import starRoutes from './starRoutes';
 import executionRoutes from './executionRoutes';
+import followRoutes from './followRoutes';
+import notificationRoutes from './notificationRoutes';
 import webhookRoutes from './webhookRoutes';
 import cspReportRoutes from './cspReportRoutes';
 import { HTTP_STATUS } from '../utils/constants';
@@ -56,6 +58,8 @@ router.use('/users', verifyCsrfToken, userRoutes);
 router.use('/snippets', verifyCsrfToken, snippetRoutes);
 router.use('/comments', verifyCsrfToken, commentRoutes);
 router.use('/stars', verifyCsrfToken, starRoutes);
+router.use('/follows', verifyCsrfToken, followRoutes);
+router.use('/notifications', verifyCsrfToken, notificationRoutes);
 router.use('/executions', verifyCsrfToken, executionRoutes);
 router.use('/languages', executionRoutes); // For supported languages endpoint (read-only)
 router.use('/webhooks', webhookRoutes);
@@ -116,6 +120,54 @@ router.get('/docs', (req: Request, res: Response) => {
         stats: 'GET /api/stars/snippets/:id/stars/stats - Get star statistics',
       },
       
+      // Follow endpoints
+      follows: {
+        toggle: {
+          endpoint: 'POST /api/follows/users/:id/follows',
+          description: 'Toggle follow/unfollow a user',
+          auth: 'Required',
+          params: { id: 'Target user ID' },
+          response: '{ isFollowing: boolean, followerCount: number }',
+        },
+        followerCount: {
+          endpoint: 'GET /api/follows/users/:id/followers/count',
+          description: 'Get follower count for a user',
+          auth: 'Optional',
+          params: { id: 'User ID' },
+          response: '{ count: number }',
+        },
+        followingCount: {
+          endpoint: 'GET /api/follows/users/:id/following/count',
+          description: 'Get following count for a user',
+          auth: 'Optional',
+          params: { id: 'User ID' },
+          response: '{ count: number }',
+        },
+        check: {
+          endpoint: 'GET /api/follows/users/:id/follows/me',
+          description: 'Check if current user follows target user',
+          auth: 'Required',
+          params: { id: 'Target user ID' },
+          response: '{ isFollowing: boolean }',
+        },
+        followers: {
+          endpoint: 'GET /api/follows/users/:id/followers',
+          description: 'Get paginated list of followers',
+          auth: 'Optional',
+          params: { id: 'User ID' },
+          query: { page: 'Page number (default: 1)', limit: 'Items per page (default: 20, max: 100)' },
+          response: '{ data: User[], pagination: { page, limit, totalPages, totalItems, hasMore } }',
+        },
+        following: {
+          endpoint: 'GET /api/follows/users/:id/following',
+          description: 'Get paginated list of users being followed',
+          auth: 'Optional',
+          params: { id: 'User ID' },
+          query: { page: 'Page number (default: 1)', limit: 'Items per page (default: 20, max: 100)' },
+          response: '{ data: User[], pagination: { page, limit, totalPages, totalItems, hasMore } }',
+        },
+      },
+      
       // Execution endpoints
       executions: {
         execute: 'POST /api/executions - Execute code (all languages free)',
@@ -123,6 +175,40 @@ router.get('/docs', (req: Request, res: Response) => {
         stats: 'GET /api/executions/stats - Get execution statistics',
         get: 'GET /api/executions/:id - Get execution by ID',
         languages: 'GET /api/executions/languages - Get supported languages',
+      },
+      
+      // Notification endpoints
+      notifications: {
+        list: {
+          endpoint: 'GET /api/notifications',
+          description: 'Get user notifications with pagination',
+          auth: 'Required',
+          query: { 
+            page: 'Page number (default: 1)', 
+            limit: 'Items per page (default: 20, max: 50)',
+            unreadOnly: 'Filter to show only unread notifications (optional boolean)'
+          },
+          response: '{ data: Notification[], pagination: { page, limit, total, totalPages, hasNext, hasPrev } }',
+        },
+        unreadCount: {
+          endpoint: 'GET /api/notifications/unread-count',
+          description: 'Get count of unread notifications',
+          auth: 'Required',
+          response: '{ count: number }',
+        },
+        markAsRead: {
+          endpoint: 'PATCH /api/notifications/:id/read',
+          description: 'Mark a specific notification as read',
+          auth: 'Required',
+          params: { id: 'Notification ID' },
+          response: '{ message: string }',
+        },
+        markAllAsRead: {
+          endpoint: 'PATCH /api/notifications/read-all',
+          description: 'Mark all user notifications as read',
+          auth: 'Required',
+          response: '{ message: string, count: number }',
+        },
       },
       
       // Webhook endpoints

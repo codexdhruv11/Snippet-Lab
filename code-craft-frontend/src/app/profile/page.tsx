@@ -7,16 +7,18 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Edit2, Save, User, Code, Terminal, Star } from "lucide-react";
+import { Edit2, Save, User, Code, Terminal, Star, Users, UserPlus } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ContributionGraph } from "@/components/profile/ContributionGraph";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthStore } from "@/stores/authStore";
-import { apiClient } from "@/lib/api";
+import { apiClient, followApi } from "@/lib/api";
 import { API_ENDPOINTS, API_LIMITS } from "@/lib/constants";
 import { SnippetCard } from "@/components/snippet/SnippetCard";
+import { FollowersModal } from "@/components/user/FollowersModal";
 
 // Form validation schema
 const profileSchema = z.object({
@@ -35,6 +37,8 @@ export default function ProfilePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [isFollowersModalOpen, setIsFollowersModalOpen] = useState(false);
+  const [followersModalTab, setFollowersModalTab] = useState<"followers" | "following">("followers");
   
   // Define queries with proper enabling conditions
   const userQuery = useQuery({
@@ -81,6 +85,27 @@ const userSnippetsQuery = useQuery({
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
   
+  // Follower and following counts
+  const followerCountQuery = useQuery({
+    queryKey: ["followerCount", user?._id],
+    queryFn: async () => {
+      if (!user?._id) return { count: 0 };
+      return await followApi.getFollowerCount(user._id);
+    },
+    enabled: isAuthenticated && !!user?._id,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+  
+  const followingCountQuery = useQuery({
+    queryKey: ["followingCount", user?._id],
+    queryFn: async () => {
+      if (!user?._id) return { count: 0 };
+      return await followApi.getFollowingCount(user._id);
+    },
+    enabled: isAuthenticated && !!user?._id,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+  
   // Update profile mutation
   const updateProfile = useMutation({
     mutationFn: async (data: ProfileFormValues) => {
@@ -114,6 +139,8 @@ const userSnippetsQuery = useQuery({
   const executionStats = executionStatsQuery.data;
   const userSnippets = userSnippetsQuery.data;
   const starredSnippets = starredSnippetsQuery.data;
+  const followerCount = followerCountQuery.data?.count || 0;
+  const followingCount = followingCountQuery.data?.count || 0;
   
   // Update form when user data is loaded
   useEffect(() => {
@@ -154,9 +181,24 @@ const userSnippetsQuery = useQuery({
     setIsEditing(!isEditing);
   };
 
+  const openFollowersModal = (tab: "followers" | "following") => {
+    setFollowersModalTab(tab);
+    setIsFollowersModalOpen(true);
+  };
+
   return (
     <div className="container py-8">
-      <h1 className="text-heading-2-mobile tablet:text-heading-2-desktop mb-6">My Profile</h1>
+      <div className="flex flex-col gap-4 mb-6 tablet:flex-row tablet:items-center tablet:justify-between">
+        <h1 className="text-heading-2-mobile tablet:text-heading-2-desktop">My Profile</h1>
+        <Button 
+          variant="outline" 
+          onClick={() => router.push("/discover")}
+          className="flex items-center gap-2"
+        >
+          <Users className="h-4 w-4" />
+          Discover Users
+        </Button>
+      </div>
       
       <div className="grid grid-cols-1 gap-6 tablet:grid-cols-2 desktop:grid-cols-3">
         {/* Profile Card */}
@@ -255,6 +297,27 @@ const userSnippetsQuery = useQuery({
                     {userData?.bio || user?.bio || "No bio provided yet."}
                   </p>
                 </div>
+                
+                <div className="flex gap-4 pt-4 border-t">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => openFollowersModal("followers")}
+                    className="flex items-center gap-2 p-0 h-auto hover:bg-transparent"
+                  >
+                    <span className="font-semibold">{followerCount}</span>
+                    <span className="text-muted-foreground">Followers</span>
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => openFollowersModal("following")}
+                    className="flex items-center gap-2 p-0 h-auto hover:bg-transparent"
+                  >
+                    <span className="font-semibold">{followingCount}</span>
+                    <span className="text-muted-foreground">Following</span>
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
@@ -298,6 +361,11 @@ const userSnippetsQuery = useQuery({
           </CardContent>
         </Card>
 
+        {/* Contribution Graph */}
+        <div className="desktop:col-span-3">
+          <ContributionGraph userId={user?._id || ""} />
+        </div>
+
         {/* User's Snippets */}
         <Card className="desktop:col-span-3">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -315,7 +383,7 @@ const userSnippetsQuery = useQuery({
           <CardContent>
             {userSnippets?.data?.length ? (
               <div className="responsive-grid">
-                {userSnippets.data.map((snippet: any) => (
+                {userSnippets.data.map((snippet) => (
                   <SnippetCard key={snippet._id} snippet={snippet} />
                 ))}
               </div>
@@ -345,7 +413,7 @@ const userSnippetsQuery = useQuery({
           <CardContent>
             {starredSnippets?.data?.length ? (
               <div className="responsive-grid">
-                {starredSnippets.data.map((snippet: any) => (
+                {starredSnippets.data.map((snippet) => (
                   <SnippetCard key={snippet._id} snippet={snippet} />
                 ))}
               </div>
@@ -358,6 +426,16 @@ const userSnippetsQuery = useQuery({
           </CardContent>
         </Card>
       </div>
+      
+      {/* Followers/Following Modal */}
+      {user?._id && (
+        <FollowersModal
+          isOpen={isFollowersModalOpen}
+          onClose={() => setIsFollowersModalOpen(false)}
+          userId={user._id}
+          initialTab={followersModalTab}
+        />
+      )}
     </div>
   );
-} 
+}

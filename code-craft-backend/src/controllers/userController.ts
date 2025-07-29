@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
-import { User, CodeExecution, Star } from '../models';
+import { User, CodeExecution, Star, Snippet } from '../models';
 import { catchAsync } from '../middleware/errorHandler';
 import { HTTP_STATUS, ERROR_CODES } from '../utils/constants';
 import { logger } from '../utils/logger';
-import { validateObjectId } from '../utils/sanitization';
+import { validateObjectId, sanitizeSearchInput } from '../utils/sanitization';
 import { clearAuthCookie } from '../utils/cookies';
+import { parsePaginationParams, buildPaginationResponse } from '../utils/pagination';
+import { getUsersWithFollowCounts } from '../utils/userAggregations';
 
 /**
  * User controller handling user-related operations
@@ -199,7 +201,7 @@ export const getUserStats = catchAsync(async (req: Request, res: Response): Prom
 });
 
 /**
- * Get user's public profile (limited information)
+ * Get user's public profile with enhanced information
  */
 export const getUserProfile = catchAsync(async (req: Request, res: Response): Promise<void> => {
   const { id: userId } = req.params;
@@ -216,26 +218,59 @@ export const getUserProfile = catchAsync(async (req: Request, res: Response): Pr
     return;
   }
 
-  const user = await User.findById(validUserId).lean();
+  try {
+    // Get user with follower/following counts using aggregation
+    const userWithCounts = await User.getUserWithFollows(validUserId);
 
-  if (!user) {
-    res.status(HTTP_STATUS.NOT_FOUND).json({
-      error: {
-        message: 'User not found',
-        code: ERROR_CODES.NOT_FOUND,
+    if (!userWithCounts) {
+      res.status(HTTP_STATUS.NOT_FOUND).json({
+        error: {
+          message: 'User not found',
+          code: ERROR_CODES.NOT_FOUND,
+        },
+      });
+      return;
+    }
+
+    // Get recent snippets
+    const recentSnippets = await Snippet.find({ userId: validUserId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('title description programmingLanguage createdAt tags')
+      .populate('starCount')
+      .populate('commentCount')
+      .lean();
+
+    // Get recent executions
+    const recentExecutions = await CodeExecution.find({ userId: validUserId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('language executionTime output error createdAt')
+      .lean();
+
+    // Structure the enhanced profile response
+    const enhancedProfile = {
+      user: {
+        id: userWithCounts._id,
+        name: userWithCounts.name,
+        bio: userWithCounts.bio || null,
+        createdAt: userWithCounts.createdAt,
+        followerCount: userWithCounts.followerCount || 0,
+        followingCount: userWithCounts.followingCount || 0,
       },
-    });
-    return;
+      recentActivity: {
+        snippets: recentSnippets,
+        executions: recentExecutions,
+      },
+    };
+
+    logger.info(`Enhanced profile retrieved for user: ${validUserId}`);
+
+    res.status(HTTP_STATUS.OK).json(enhancedProfile);
+  } catch (error) {
+    logger.error('Failed to get user profile:', error);
+    throw error;
   }
-
-  // Return only public information
-  const publicProfile = {
-    id: user._id,
-    name: user.name,
-    createdAt: user.createdAt,
-  };
-
-  res.status(HTTP_STATUS.OK).json({ user: publicProfile });
 });
 
 /**
@@ -292,4 +327,212 @@ export const changePassword = catchAsync(async (req: Request, res: Response): Pr
   res.status(HTTP_STATUS.OK).json({
     message: 'Password changed successfully. Please login again with your new password.',
   });
+});
+
+/**
+ * Search users by name
+ */
+export const searchUsers = catchAsync(async (req: Request, res: Response): Promise<void> => {
+  const { q: searchQuery } = req.query;
+  const { page, limit, skip } = parsePaginationParams(req);
+
+  // Sanitize search input
+  const sanitizedQuery = sanitizeSearchInput(searchQuery as string);
+
+  if (!sanitizedQuery) {
+    res.status(HTTP_STATUS.BAD_REQUEST).json({
+      error: {
+        message: 'Search query is required',
+        code: ERROR_CODES.VALIDATION_ERROR,
+      },
+    });
+    return;
+  }
+
+  try {
+    // Try to use text search first for better performance
+    let query: any;
+    let users: any[];
+    let total: number;
+
+    try {
+      // Use MongoDB text search for better performance with text index
+      query = { $text: { $search: sanitizedQuery } };
+      
+      [users, total] = await Promise.all([
+        User.find(query, { score: { $meta: 'textScore' } })
+          .select('name bio createdAt')
+          .sort({ score: { $meta: 'textScore' } })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        User.countDocuments(query),
+      ]);
+    } catch (textSearchError) {
+      // Fallback to regex search if text index is not available
+      logger.warn('Text search failed, falling back to regex search:', textSearchError);
+      
+      const searchRegex = new RegExp(sanitizedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      query = { name: { $regex: searchRegex } };
+      
+      [users, total] = await Promise.all([
+        User.find(query)
+          .select('name bio createdAt')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        User.countDocuments(query),
+      ]);
+    }
+
+    // Return consistent structure for both authenticated and unauthenticated users
+    let enrichedUsers;
+    if (req.user && users.length > 0) {
+      // For authenticated users, use single aggregation to get all users with counts
+      const userIds = users.map(u => u._id);
+      const usersWithCounts = await User.aggregate(getUsersWithFollowCounts(userIds));
+      
+      // Create a map for quick lookup
+      const userCountsMap = new Map(usersWithCounts.map(u => [u._id.toString(), u]));
+      
+      // Map original search results with counts
+      enrichedUsers = users.map(user => {
+        const userWithCounts = userCountsMap.get(user._id.toString());
+        return {
+          id: user._id,
+          name: user.name,
+          bio: user.bio || null,
+          createdAt: user.createdAt,
+          followerCount: userWithCounts?.followerCount || 0,
+          followingCount: userWithCounts?.followingCount || 0,
+        };
+      });
+    } else {
+      // For unauthenticated users, return same structure with 0 counts
+      enrichedUsers = users.map(user => ({
+        id: user._id,
+        name: user.name,
+        bio: user.bio || null,
+        createdAt: user.createdAt,
+        followerCount: 0,
+        followingCount: 0,
+      }));
+    }
+
+    const response = buildPaginationResponse(enrichedUsers, total, page, limit);
+
+    logger.info(`User search performed: query="${sanitizedQuery}", results=${total}`);
+
+    res.status(HTTP_STATUS.OK).json(response);
+  } catch (error) {
+    logger.error('Failed to search users:', error);
+    throw error;
+  }
+});
+
+/**
+ * Get user's contribution graph data for visualization
+ * Returns daily snippet creation counts for a specified date range (default: past 365 days)
+ */
+export const getContributionGraph = catchAsync(async (req: Request, res: Response): Promise<void> => {
+  const { id: userId } = req.params;
+  const { startDate, endDate } = req.query;
+
+  // Validate user ID
+  const validUserId = validateObjectId(userId);
+  if (!validUserId) {
+    res.status(HTTP_STATUS.BAD_REQUEST).json({
+      error: {
+        message: 'Invalid user ID format',
+        code: ERROR_CODES.VALIDATION_ERROR,
+      },
+    });
+    return;
+  }
+
+  // Verify user exists
+  const user = await User.findById(validUserId).lean();
+  if (!user) {
+    res.status(HTTP_STATUS.NOT_FOUND).json({
+      error: {
+        message: 'User not found',
+        code: ERROR_CODES.NOT_FOUND,
+      },
+    });
+    return;
+  }
+
+  try {
+    // Parse date range (default: past 365 days)
+    const end = endDate ? new Date(endDate as string) : new Date();
+    const start = startDate ? new Date(startDate as string) : new Date(end.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+    // Set times to start/end of day for consistency
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    logger.info(`Fetching contribution graph for user ${validUserId} from ${start.toISOString()} to ${end.toISOString()}`);
+
+    // Aggregation pipeline to get daily snippet counts
+    const contributionData = await Snippet.aggregate([
+      {
+        $match: {
+          userId: validUserId,
+          createdAt: {
+            $gte: start,
+            $lte: end,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+            },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
+
+    // Create a map for quick lookup
+    const contributionMap = new Map(
+      contributionData.map(item => [item._id, item.count])
+    );
+
+    // Generate complete date range with zero-filled missing dates
+    const contributions = [];
+    const currentDate = new Date(start);
+    
+    while (currentDate <= end) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      contributions.push({
+        date: dateStr,
+        count: contributionMap.get(dateStr) || 0,
+      });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    logger.info(`Contribution graph generated for user ${validUserId}: ${contributions.length} days, ${contributionData.length} active days`);
+
+    res.status(HTTP_STATUS.OK).json({
+      data: contributions,
+      meta: {
+        startDate: start.toISOString().split('T')[0],
+        endDate: end.toISOString().split('T')[0],
+        totalDays: contributions.length,
+        activeDays: contributionData.length,
+        totalContributions: contributions.reduce((sum, day) => sum + day.count, 0),
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to get contribution graph:', error);
+    throw error;
+  }
 });

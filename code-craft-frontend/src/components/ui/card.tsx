@@ -18,11 +18,16 @@ const Card = React.forwardRef<
   if (magic) {
     // Extract event handlers that might conflict with Framer Motion
     const {
-      onAnimationStart,
-      onAnimationEnd,
-      onDragStart,
-      onDragEnd,
-      onDrag,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      onAnimationStart: _onAnimationStart,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      onAnimationEnd: _onAnimationEnd,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      onDragStart: _onDragStart,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      onDragEnd: _onDragEnd,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      onDrag: _onDrag,
       ...motionSafeProps
     } = props;
 

@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 export function SuppressHydrationWarning({ children }: { children: React.ReactNode }) {
-  const [isHydrated, setIsHydrated] = useState(false);
-
   useEffect(() => {
     // Suppress hydration warnings caused by browser extensions
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -27,8 +25,6 @@ export function SuppressHydrationWarning({ children }: { children: React.ReactNo
         originalError.apply(console, args);
       };
     }
-    
-    setIsHydrated(true);
   }, []);
 
   // Prevent hydration mismatch by not rendering until client-side

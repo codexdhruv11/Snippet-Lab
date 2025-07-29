@@ -64,7 +64,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] p-0 gap-0" showCloseButton={false}>
+      <DialogContent className="sm:max-w-[600px] p-0 gap-0">
         <DialogHeader className="px-4 py-3 border-b relative">
           {/* Close Dialog Button - positioned further right */}
           <Button
@@ -126,11 +126,11 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
                             {snippet.title}
                           </span>
                           <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded">
-                            {getLanguageIcon(snippet.programmingLanguage)}
+                            {getLanguageIcon(snippet.language)}
                           </span>
                         </div>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span>{snippet.userName}</span>
+                          <span>{snippet.author?.name || 'Unknown'}</span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {formatDistanceToNow(new Date(snippet.createdAt), {

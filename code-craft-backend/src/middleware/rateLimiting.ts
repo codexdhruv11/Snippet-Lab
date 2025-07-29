@@ -182,6 +182,26 @@ export const webhookLimiter = rateLimit({
   },
 });
 
+// Notification fetch rate limiter
+export const notificationLimiter = rateLimit({
+  windowMs: RATE_LIMITS.NOTIFICATION_FETCH.windowMs,
+  max: RATE_LIMITS.NOTIFICATION_FETCH.max,
+  keyGenerator: authKeyGenerator,
+  handler: (req: Request, res: Response) => {
+    logger.warn(`Notification rate limit exceeded for ${req.ip} on ${req.path}`);
+    
+    return res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
+      error: {
+        message: 'Too many notification requests, please try again later',
+        code: ERROR_CODES.RATE_LIMIT_EXCEEDED,
+        retryAfter: Math.ceil(RATE_LIMITS.NOTIFICATION_FETCH.windowMs / 1000),
+      },
+    });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Authentication rate limiter to prevent brute force attacks
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

@@ -3,14 +3,19 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, X, Sun, Moon, Code, Search, ChevronDown } from "lucide-react";
+import { Menu, X, Sun, Moon, Code, Search, ChevronDown, Users, Bell } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/authStore";
 import { useUIStore } from "@/stores/uiStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import { SearchModal } from "@/components/search/SearchModal";
+import { UserSearchModal } from "@/components/user/UserSearchModal";
+import { NotificationDropdown } from "@/components/notification/NotificationDropdown";
+import { useUnreadCount } from '@/hooks/useNotifications';
+import { UnreadCountResponse } from '@/types/api';
 import { ClientOnly } from "@/components/ui/client-only";
 import {
   DropdownMenu,
@@ -20,6 +25,38 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+// Notification Bell Component
+function NotificationBell() {
+  const { data: unreadData } = useUnreadCount();
+  const unreadCount = (unreadData as UnreadCountResponse)?.count || 0;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="relative"
+          aria-label="Notifications"
+        >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <Badge 
+              variant="destructive" 
+              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+            >
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </Badge>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="p-0">
+        <NotificationDropdown />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function Header() {
   const router = useRouter();
@@ -31,6 +68,7 @@ export function Header() {
   const { isMobile, isTablet } = useResponsive();
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
 
   const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
   
@@ -89,13 +127,32 @@ export function Header() {
         <Button 
           variant="ghost" 
           size="icon" 
-          aria-label="Search (Ctrl+K)" 
+          aria-label="Search snippets (Ctrl+K)" 
           className="flex"
           onClick={() => setIsSearchOpen(true)}
           title="Search snippets (Ctrl+K)"
         >
           <Search className="h-5 w-5" />
         </Button>
+        
+        {/* User Search Button - Only show when authenticated */}
+        {isAuthenticated && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            aria-label="Search users" 
+            className="flex"
+            onClick={() => setIsUserSearchOpen(true)}
+            title="Search users"
+          >
+            <Users className="h-5 w-5" />
+          </Button>
+        )}
+        
+        {/* Notification Button - Only show when authenticated */}
+        {isAuthenticated && (
+          <NotificationBell />
+        )}
         
         {/* Theme Toggle */}
         <Button
@@ -128,6 +185,9 @@ export function Header() {
               <DropdownMenuItem onClick={() => router.push("/profile")}>
                 Profile
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/discover")}>
+                Discover Users
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/snippets")}>
                 My Snippets
               </DropdownMenuItem>
@@ -154,6 +214,9 @@ export function Header() {
       
       {/* Search Modal */}
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      
+      {/* User Search Modal */}
+      <UserSearchModal isOpen={isUserSearchOpen} onClose={() => setIsUserSearchOpen(false)} />
     </div>
   );
 }

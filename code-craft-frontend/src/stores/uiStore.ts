@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { STORAGE_KEYS } from '@/lib/constants';
-import { Breakpoint, Theme } from '@/types/ui';
 
 interface UIState {
   // Sidebar

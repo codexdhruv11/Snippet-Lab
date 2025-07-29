@@ -7,6 +7,8 @@ import {
   deleteSnippet,
   getStarredSnippets,
   getSnippetsByUser,
+  getPopularTags,
+  getFeedSnippets,
 } from '../controllers/snippetController';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import {
@@ -43,12 +45,28 @@ router.get(
   getSnippets
 );
 
+// Get feed snippets from followed users (requires auth)
+router.get(
+  '/feed',
+  requireAuth,
+  validatePagination,
+  getFeedSnippets
+);
+
 // Get user's starred snippets (requires auth)
 router.get(
   '/starred',
   requireAuth,
   validatePagination,
   getStarredSnippets
+);
+
+// Get popular tags (public)
+router.get(
+  '/tags/popular',
+  optionalAuth,
+  validatePagination,
+  getPopularTags
 );
 
 // Get snippets by user (public)

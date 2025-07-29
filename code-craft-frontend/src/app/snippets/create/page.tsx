@@ -12,6 +12,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { snippetApi } from "@/lib/api";
 import { SUPPORTED_LANGUAGES } from "@/lib/constants";
 import { toast } from "sonner";
+import { TagInput } from "@/components/snippet/TagInput";
 
 // Sanitize function to prevent XSS from URL parameters
 const sanitizeUrlParam = (param: string | null): string => {
@@ -43,16 +44,10 @@ export default function CreateSnippetPage() {
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState(initialLanguage);
   const [code, setCode] = useState(initialCode);
+  const [tags, setTags] = useState<string[]>([]);
   
   const { mutate: createSnippet, isPending } = useMutation({
     mutationFn: async () => {
-      console.log('Creating snippet with data:', {
-        title: title.trim(),
-        description: description.trim(),
-        language,
-        code: code.substring(0, 100) + '...' // Log first 100 chars
-      });
-      
       if (!title.trim()) {
         throw new Error("Title is required");
       }
@@ -60,19 +55,14 @@ export default function CreateSnippetPage() {
         throw new Error("Code is required");
       }
       
-      try {
-        const result = await snippetApi.createSnippet({
-          title: title.trim(),
-          description: description.trim(),
-          language,
-          code,
-        });
-        console.log('Snippet created successfully:', result);
-        return result;
-      } catch (error) {
-        console.error('Error creating snippet:', error);
-        throw error;
-      }
+      const result = await snippetApi.createSnippet({
+        title: title.trim(),
+        description: description.trim(),
+        language,
+        code,
+        tags: tags.length > 0 ? tags : undefined,
+      });
+      return result;
     },
     onSuccess: (data) => {
       toast.success("Snippet created successfully!");
@@ -81,22 +71,23 @@ export default function CreateSnippetPage() {
       setDescription("");
       setCode("");
       setLanguage(SUPPORTED_LANGUAGES[0].id);
+      setTags([]);
       
       // Navigate to the created snippet
       router.push(`/snippets/${data.snippet._id}`);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       let errorMessage = "Failed to create snippet";
       
-      if (error?.response?.data?.error) {
-        const apiError = error.response.data.error;
-        if (apiError.details && Array.isArray(apiError.details)) {
+      if (error && typeof error === 'object' && 'response' in error) {
+        const apiError = (error as { response?: { data?: { error?: { details?: Array<{ msg: string }>, message?: string } } } })?.response?.data?.error;
+        if (apiError?.details && Array.isArray(apiError.details)) {
           // Handle validation errors
-          errorMessage = apiError.details.map((detail: any) => detail.msg).join(", ");
-        } else if (apiError.message) {
+          errorMessage = apiError.details.map((detail) => detail.msg).join(", ");
+        } else if (apiError?.message) {
           errorMessage = apiError.message;
         }
-      } else if (error?.message) {
+      } else if (error instanceof Error) {
         errorMessage = error.message;
       }
       
@@ -105,19 +96,8 @@ export default function CreateSnippetPage() {
   });
   
   const handleSubmit = (e: React.FormEvent) => {
-    console.log('Form submitted!');
-    console.log('Form data:', { title, description, language, code: code.substring(0, 100) + '...' });
     e.preventDefault();
     createSnippet();
-  };
-  
-  // Debug button click
-  const handleButtonClick = () => {
-    console.log('Create button clicked!');
-    console.log('Button disabled:', isPending || !title.trim() || !code.trim());
-    console.log('isPending:', isPending);
-    console.log('title valid:', !!title.trim());
-    console.log('code valid:', !!code.trim());
   };
   
   return (
@@ -202,6 +182,18 @@ export default function CreateSnippetPage() {
                 </select>
               </div>
               
+              <div>
+                <label htmlFor="tags" className="mb-2 block text-sm font-medium">
+                  Tags
+                </label>
+                <TagInput
+                  value={tags}
+                  onChange={setTags}
+                  placeholder="Add tags to help others find your snippet..."
+                  disabled={isPending}
+                />
+              </div>
+
               <div>
                 <label htmlFor="code" className="mb-2 block text-sm font-medium">
                   Code <span className="text-destructive">*</span>

@@ -22,6 +22,7 @@ export const API_ENDPOINTS = {
     ME: '/users/me',
     UPDATE: '/users/me',
     CHANGE_PASSWORD: '/users/change-password',
+    CONTRIBUTION_GRAPH: (userId: string) => `/users/${userId}/contribution-graph`,
   },
   SNIPPETS: {
     BASE: '/snippets',
@@ -29,10 +30,23 @@ export const API_ENDPOINTS = {
     STARRED: '/snippets/starred',
     DETAIL: (id: string) => `/snippets/${id}`,
   },
+  TAGS: {
+    POPULAR: '/snippets/tags/popular',
+  },
   COMMENTS: {
     FOR_SNIPPET: (snippetId: string) => `/snippets/${snippetId}/comments`,
     SINGLE: (commentId: string) => `/comments/${commentId}`,
     MY_COMMENTS: '/comments/my-comments',
+    THREADED: (snippetId: string) => `/snippets/${snippetId}/comments/threaded`,
+    ADD_REPLY: (snippetId: string, commentId: string) => `/snippets/${snippetId}/comments/${commentId}/replies`,
+    GET_REPLIES: (commentId: string) => `/comments/${commentId}/replies`,
+    THREAD: (commentId: string) => `/comments/${commentId}/thread`,
+  },
+  NOTIFICATIONS: {
+    LIST: '/notifications',
+    MARK_READ: (notificationId: string) => `/notifications/${notificationId}/read`,
+    MARK_ALL_READ: '/notifications/read-all',
+    UNREAD_COUNT: '/notifications/unread-count',
   },
   STARS: {
     TOGGLE: (snippetId: string) => `/snippets/${snippetId}/stars`,
@@ -40,6 +54,20 @@ export const API_ENDPOINTS = {
     CHECK: (snippetId: string) => `/snippets/${snippetId}/stars/me`,
     LIST: (snippetId: string) => `/snippets/${snippetId}/stars`,
     STATS: (snippetId: string) => `/snippets/${snippetId}/stars/stats`,
+  },
+  FOLLOWS: {
+    TOGGLE: (userId: string) => `/users/${userId}/follow`,
+    FOLLOWERS: (userId: string) => `/users/${userId}/followers`,
+    FOLLOWING: (userId: string) => `/users/${userId}/following`,
+    FOLLOWER_COUNT: (userId: string) => `/users/${userId}/followers/count`,
+    FOLLOWING_COUNT: (userId: string) => `/users/${userId}/following/count`,
+    CHECK: (userId: string) => `/users/${userId}/follow/me`,
+  },
+  USER_SEARCH: {
+    SEARCH: '/users/search',
+  },
+  USER_PROFILE: {
+    PUBLIC: (userId: string) => `/users/${userId}/profile`,
   },
   EXECUTIONS: {
     BASE: '/executions',
@@ -127,6 +155,12 @@ export const API_LIMITS = {
   NAME_MAX_LENGTH: 100,
   BIO_MAX_LENGTH: 500,
   EXECUTION_TIMEOUT: 30000, // 30 seconds
+  MAX_USERS_PER_PAGE: 20, // Pagination limit for user lists
+  MAX_TAGS_PER_SNIPPET: 10,
+  MAX_TAG_LENGTH: 30,
+  MIN_TAG_LENGTH: 2,
+  MAX_COMMENT_DEPTH: 3, // Maximum nesting level for comment threads
+  MAX_NOTIFICATIONS_PER_PAGE: 20, // Pagination limit for notifications
   RATE_LIMIT: {
     EXECUTIONS: 10, // 10 per minute
     SNIPPET_CREATION: 5, // 5 per minute
@@ -135,6 +169,11 @@ export const API_LIMITS = {
     STARS: 30, // 30 per minute
   },
 };
+
+/**
+ * Notification Settings
+ */
+export const NOTIFICATION_POLL_INTERVAL = 60000; // 60 seconds - less aggressive polling
 
 /**
  * Error Codes

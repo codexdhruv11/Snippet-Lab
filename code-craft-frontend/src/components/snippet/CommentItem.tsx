@@ -1,12 +1,21 @@
-import React from 'react';
-import { User, Edit, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Edit, Trash2, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useRelativeDate } from '@/lib/date-utils';
 import { API_LIMITS } from '@/lib/constants';
+import { ReplyBox } from './ReplyBox';
+import { cn } from '@/lib/utils';
+import { ThreadedComment } from '@/types/api';
 
 interface CommentItemProps {
-  comment: any;
+  comment: {
+    _id: string;
+    userId?: string | { _id: string; name: string };
+    userName?: string;
+    content: string;
+    createdAt: string;
+  };
   currentUserId?: string;
   isEditing: boolean;
   editingContent: string;
@@ -31,14 +40,14 @@ export function CommentItem({
   isPending = false
 }: CommentItemProps) {
   const relativeDate = useRelativeDate(comment.createdAt);
-  const isAuthor = currentUserId === (comment.userId?._id || comment.userId);
+  const isAuthor = currentUserId === (typeof comment.userId === 'object' ? comment.userId._id : comment.userId);
 
   return (
     <>
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center">
           <User className="h-4 w-4 mr-2" />
-          <span className="font-medium">{comment.userName || comment.userId?.name}</span>
+          <span className="font-medium">{comment.userName || (typeof comment.userId === 'object' ? comment.userId.name : '')}</span>
         </div>
         <span className="text-xs text-muted-foreground">
           {relativeDate}

@@ -2,19 +2,32 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Star, MessageSquare, Calendar } from "lucide-react";
 import { useRelativeDate } from "@/lib/date-utils";
 
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { formatDate, truncateText } from "@/lib/utils";
+import { truncateText } from "@/lib/utils";
 import { SnippetCardProps } from "@/types/ui";
-import { staggeredItem } from "@/lib/animations";
+import { staggerItem } from "@/lib/animations";
 import { SUPPORTED_LANGUAGES } from "@/lib/constants";
 import { StarButton } from './StarButton';
+import { FollowButton } from '@/components/user/FollowButton';
+import { useAuthStore } from '@/stores/authStore';
+import { TagDisplay } from './TagDisplay';
 
 export function SnippetCard({ snippet, onClick, className }: SnippetCardProps) {
+  // Auth state
+  const { user, isAuthenticated } = useAuthStore();
+  const router = useRouter();
+  
+  const handleTagClick = (tag: string) => {
+    // Navigate to snippets page with tag filter
+    router.push(`/snippets?tags=${encodeURIComponent(tag)}`);
+  };
+  
   // Find language info
   const languageInfo = SUPPORTED_LANGUAGES.find(lang => lang.id === snippet.language) || 
     SUPPORTED_LANGUAGES[0];
@@ -26,12 +39,13 @@ export function SnippetCard({ snippet, onClick, className }: SnippetCardProps) {
   const commentCount = snippet.comments || 0;
   const starCount = snippet.stars || 0;
   const userName = snippet.author ? snippet.author.name : "Unknown";
+  const isOwnSnippet = user?._id === snippet.author?._id;
   
   // Get hydration-safe relative date
   const relativeDate = useRelativeDate(snippet.createdAt);
   
   return (
-    <motion.div variants={staggeredItem as any}>
+    <motion.div variants={staggerItem}>
       <Link href={`/snippets/${snippet._id}`} onClick={onClick}>
         <Card 
           magic
@@ -73,22 +87,51 @@ export function SnippetCard({ snippet, onClick, className }: SnippetCardProps) {
             </div>
           </CardContent>
           
-          <CardFooter className="flex items-center justify-between pt-0 text-xs text-muted-foreground">
-            <div className="flex items-center">
-              <span>By {userName}</span>
-            </div>
-            <div className="flex items-center">
-              <Calendar className="mr-1 h-3 w-3" />
-              <span>{relativeDate}</span>
-            </div>
-          </CardFooter>
-          
-          <CardFooter className="px-4 py-3 border-t flex justify-between">
-            <div className="flex items-center space-x-3">
+          <CardFooter className="px-4 py-3 border-t flex flex-col gap-3">
+            <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Link 
+                  href={`/users/${snippet.author?._id}`} 
+                  className="hover:text-foreground transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="hover:underline">By {userName}</span>
+                </Link>
+                {isAuthenticated && !isOwnSnippet && snippet.author?._id && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <FollowButton 
+                      userId={snippet.author._id} 
+                      initialFollowState={false}
+                      size="sm"
+                    />
+                  </div>
+                )}
+              </div>
               <div className="flex items-center">
-                <StarButton snippetId={snippet._id} initialStarCount={starCount} isSmall />
+                <Calendar className="mr-1 h-3 w-3" />
+                <span>{relativeDate}</span>
               </div>
             </div>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center">
+                <div onClick={(e) => e.stopPropagation()}>
+                  <StarButton snippetId={snippet._id} initialStarCount={starCount} isSmall />
+                </div>
+              </div>
+            </div>
+            
+            {/* Tags */}
+            {snippet.tags && snippet.tags.length > 0 && (
+              <div className="w-full" onClick={(e) => e.stopPropagation()}>
+                <TagDisplay
+                  tags={snippet.tags}
+                  onTagClick={handleTagClick}
+                  size="sm"
+                  maxTags={3}
+                  showCount={true}
+                />
+              </div>
+            )}
           </CardFooter>
         </Card>
       </Link>

@@ -1,18 +1,18 @@
 'use client';
 
-import React, { useState } from "react";
+import React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Calendar, User, Edit, Trash2, Share } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { CommentList } from "@/components/snippet/CommentList";
 import { StarButton } from "@/components/snippet/StarButton";
 import { CodeEditorContainer } from "@/components/editor/CodeEditorContainer";
+import { TagDisplay } from "@/components/snippet/TagDisplay";
 import { useAuthStore } from "@/stores/authStore";
-import { useResponsive } from "@/hooks/useResponsive";
 import { apiClient } from "@/lib/api";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { formatDistanceToNow } from "date-fns";
@@ -46,7 +46,7 @@ export default function SnippetDetailPage() {
       router.push("/snippets");
       queryClient.invalidateQueries({ queryKey: ["snippets"] });
     },
-    onError: (error) => {
+    onError: () => {
       toast.error("Failed to delete snippet");
       // Handle delete error silently
     },
@@ -75,6 +75,11 @@ export default function SnippetDetailPage() {
     }
   };
 
+  // Handle tag click
+  const handleTagClick = (tag: string) => {
+    router.push(`/snippets?tags=${encodeURIComponent(tag)}`);
+  };
+
   if (isLoading) {
     return (
       <div className="container py-8 text-center">
@@ -94,31 +99,50 @@ export default function SnippetDetailPage() {
     );
   }
 
-  const isOwner = user?._id === snippet.userId;
+  const isOwner = user?._id === snippet.author?._id;
 
   return (
     <div className="container py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-heading-3-mobile tablet:text-heading-3-desktop">{snippet.title}</h1>
-        <div className="flex items-center space-x-2">
-          <StarButton snippetId={snippetId} initialStarCount={snippet.starCount} />
-          <Button variant="outline" size="sm" onClick={handleShare}>
-            <Share className="mr-2 h-4 w-4" />
-            Share
-          </Button>
-          {isOwner && (
-            <>
-              <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              <Button variant="destructive" size="sm" onClick={handleDelete}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            </>
-          )}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-heading-3-mobile tablet:text-heading-3-desktop">{snippet.title}</h1>
+          <div className="flex items-center space-x-2">
+            <StarButton snippetId={snippetId} initialStarCount={snippet.starCount} />
+            <Button variant="outline" size="sm" onClick={handleShare}>
+              <Share className="mr-2 h-4 w-4" />
+              Share
+            </Button>
+            {isOwner && (
+              <>
+                <Button variant="outline" size="sm" onClick={handleEdit}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button variant="destructive" size="sm" onClick={handleDelete}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
         </div>
+        
+        {/* Description */}
+        {snippet.description && (
+          <p className="text-muted-foreground mb-4">{snippet.description}</p>
+        )}
+        
+        {/* Tags */}
+        {snippet.tags && snippet.tags.length > 0 && (
+          <div className="mb-4">
+            <TagDisplay
+              tags={snippet.tags}
+              onTagClick={handleTagClick}
+              size="md"
+              showCount={false}
+            />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 desktop:grid-cols-3">
@@ -126,7 +150,7 @@ export default function SnippetDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div className="rounded bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                {snippet.programmingLanguage}
+                {snippet.language}
               </div>
               <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                 <div className="flex items-center space-x-1">
@@ -137,7 +161,7 @@ export default function SnippetDetailPage() {
                 </div>
                 <div className="flex items-center space-x-1">
                   <User className="h-4 w-4" />
-                  <span>{snippet.userName}</span>
+                  <span>{snippet.author?.name || 'Unknown'}</span>
                 </div>
               </div>
             </CardHeader>
@@ -145,7 +169,7 @@ export default function SnippetDetailPage() {
               <div className="h-[500px] overflow-hidden rounded">
                 <CodeEditorContainer
                   code={snippet.code}
-                  language={snippet.programmingLanguage}
+                  language={snippet.language}
                   readOnly
                   height="100%"
                 />

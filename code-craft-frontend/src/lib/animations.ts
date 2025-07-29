@@ -288,10 +288,12 @@ const animations = {
 };
 
 /**
- * Check if an animation should be enabled based on priority
+ * Hook to check if an animation should be enabled based on priority
  */
-export function isAnimationEnabled(priority: 'P1' | 'P2', type: keyof typeof ANIMATION_PRIORITIES['P1'] | keyof typeof ANIMATION_PRIORITIES['P2']): boolean {
-  if (useReducedMotion()) return false;
+export function useIsAnimationEnabled(priority: 'P1' | 'P2', type: keyof typeof ANIMATION_PRIORITIES['P1'] | keyof typeof ANIMATION_PRIORITIES['P2']): boolean {
+  const prefersReducedMotion = useReducedMotion();
+  
+  if (prefersReducedMotion) return false;
   
   return ANIMATION_PRIORITIES[priority][type] ?? false;
 }

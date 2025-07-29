@@ -73,7 +73,7 @@ export interface CodeEditorProps {
   readOnly?: boolean;
   height?: string;
   theme?: 'vs-dark' | 'vs-light';
-  onMount?: (editor: any) => void;
+  onMount?: (editor: unknown) => void;
 }
 
 /**
@@ -103,6 +103,7 @@ export interface SnippetCardProps {
     comments: number;
     isStarred?: boolean;
     createdAt: string;
+    tags?: string[];
   };
   onClick?: () => void;
   className?: string;

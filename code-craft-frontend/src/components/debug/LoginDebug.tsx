@@ -10,7 +10,13 @@ import { API_BASE_URL } from '@/lib/constants';
 export function LoginDebug() {
   const [email, setEmail] = useState('test@example.com');
   const [password, setPassword] = useState('password123');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{
+    type: string;
+    success: boolean;
+    data?: unknown;
+    error?: string;
+    fullError?: unknown;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const testConnection = async () => {

@@ -96,6 +96,24 @@ export const API_CONSTANTS = {
   MAX_COMMENT_LENGTH: 1000,
   MAX_TITLE_LENGTH: 100,
   EXECUTION_TIMEOUT: 30000, // 30 seconds
+  // Tag-related constants
+  MAX_TAGS_PER_SNIPPET: 10,
+  MAX_TAG_LENGTH: 30,
+  MIN_TAG_LENGTH: 2,
+  // Comment threading constants
+  MAX_COMMENT_DEPTH: 5,
+  MAX_REPLIES_PER_COMMENT: 100,
+  DEFAULT_THREAD_LIMIT: 50,
+  // Notifications
+  NOTIFICATION_TYPES: {
+    FOLLOW: 'FOLLOW',
+    COMMENT: 'COMMENT',
+    REPLY: 'REPLY',
+    NEW_SNIPPET: 'NEW_SNIPPET',
+  } as const,
+  MAX_NOTIFICATIONS_PER_PAGE: 50,
+  NOTIFICATION_DATA_MAX_SIZE: 1000,
+  MAX_NOTIFICATION_AGE_DAYS: 90,
 } as const;
 
 // Rate Limiting Configuration
@@ -115,6 +133,10 @@ export const RATE_LIMITS = {
   GENERAL_API: {
     windowMs: 60 * 1000, // 1 minute
     max: 100, // 100 requests per minute
+  },
+  NOTIFICATION_FETCH: {
+    windowMs: 60 * 1000, // 1 minute
+    max: 60, // 60 requests per minute
   },
 } as const;
 

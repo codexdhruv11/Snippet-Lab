@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MagicBentoGrid, MagicBentoContainer } from "@/components/ui/magic-bento";
+import { MagicBentoGrid } from "@/components/ui/magic-bento";
 import TextType from "@/components/ui/TextType";
 import { Snippet } from "@/types/api";
 import { apiClient } from "@/lib/api";

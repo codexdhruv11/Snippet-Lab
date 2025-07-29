@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useCallback, useState, ReactNode } from "react";
+import React, { useRef, useEffect, ReactNode } from "react";
 import { motion, useAnimation, useInView } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useReducedMotion } from "@/lib/animations";
@@ -65,8 +65,8 @@ export function MagicBentoCard({
   onClick,
   href,
 }: MagicBentoCardProps) {
-  const ref = useRef<HTMLDivElement | HTMLAnchorElement>(null);
-  const isInView = useInView(ref as React.RefObject<HTMLElement>, { once: true, margin: "-10%" });
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-10%" });
   const prefersReducedMotion = useReducedMotion();
   const controls = useAnimation();
 
@@ -97,18 +97,7 @@ export function MagicBentoCard({
     },
   } : {};
 
-  const glowVariants = glow ? {
-    boxShadow: [
-      MAGIC_BENTO_CONFIG.shadows[shadow],
-      MAGIC_BENTO_CONFIG.shadows.glow,
-      MAGIC_BENTO_CONFIG.shadows[shadow],
-    ],
-    transition: {
-      duration: MAGIC_BENTO_CONFIG.duration.long / 1000,
-      repeat: Infinity,
-      repeatType: "reverse" as const,
-    },
-  } : {};
+  // Glow effect is handled via CSS classes
 
   useEffect(() => {
     if (isInView) {

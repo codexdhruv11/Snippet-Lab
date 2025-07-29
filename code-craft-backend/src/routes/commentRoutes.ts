@@ -6,6 +6,10 @@ import {
   deleteComment,
   getCommentById,
   getUserComments,
+  addReply,
+  getThreadedComments,
+  getReplies,
+  getCommentThread,
 } from '../controllers/commentController';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import {
@@ -13,9 +17,12 @@ import {
   validateCommentUpdate,
   validateObjectId,
   validatePagination,
+  validateReplyCreation,
+  validateThreadedComments,
 } from '../middleware/validation';
 import { commentLimiter, generalLimiter } from '../middleware/rateLimiting';
 import { verifyCsrfToken } from '../middleware/csrf';
+import { createDepthAwareCommentLimiter } from '../middleware/depthAwareRateLimiter';
 
 const router = Router();
 
@@ -33,7 +40,7 @@ router.post(
   addComment
 );
 
-// Get snippet comments (public, paginated)
+// Get snippet comments (public, paginated, supports threaded view)
 router.get(
   '/snippets/:id/comments',
   optionalAuth,
@@ -42,12 +49,49 @@ router.get(
   getComments
 );
 
+// Get threaded comments for snippet
+router.get(
+  '/snippets/:id/comments/threaded',
+  optionalAuth,
+  validateObjectId('id'),
+  validateThreadedComments,
+  getThreadedComments
+);
+
+// Create reply to a comment
+router.post(
+  '/snippets/:id/comments/:commentId/replies',
+  requireAuth,
+  verifyCsrfToken,
+  createDepthAwareCommentLimiter(), // Depth-aware rate limiting
+  validateObjectId('id'),
+  validateReplyCreation,
+  addReply
+);
+
 // Get user's comments (requires auth)
 router.get(
   '/my-comments',
   requireAuth,
   validatePagination,
   getUserComments
+);
+
+// Get direct replies to a comment (paginated)
+router.get(
+  '/:id/replies',
+  optionalAuth,
+  validateObjectId('id'),
+  validatePagination,
+  getReplies
+);
+
+// Get comment thread (comment with all nested replies)
+router.get(
+  '/:id/thread',
+  optionalAuth,
+  validateObjectId('id'),
+  getCommentThread
 );
 
 // Get comment by ID (public)

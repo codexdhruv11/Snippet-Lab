@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Editor, { OnMount, loader } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
+import type { editor } from "monaco-editor";
 
 import { useResponsive } from "@/hooks/useResponsive";
 import { useEditorStore } from "@/stores/editorStore";
@@ -55,7 +56,7 @@ export function CodeEditorContainer({
   theme: propTheme,
   options = {},
   onSave,
-}: CodeEditorProps & { options?: any; onSave?: () => void }) {
+}: CodeEditorProps & { options?: Record<string, unknown>; onSave?: () => void }) {
   const { resolvedTheme } = useTheme();
   const { isMobile } = useResponsive();
   const { fontSize, wordWrap } = useEditorStore();
@@ -66,17 +67,17 @@ export function CodeEditorContainer({
     (resolvedTheme === "dark" ? "vs-dark" : "vs-light");
 
   // Configure editor options based on device
-  const defaultOptions = {
+  const defaultOptions: editor.IStandaloneEditorConstructionOptions = {
     readOnly,
     minimap: {
       enabled: !isMobile,
     },
     fontSize: isMobile ? fontSize - 2 : fontSize,
-    wordWrap: isMobile ? "on" : (wordWrap ? "on" : "off"),
+    wordWrap: isMobile ? "on" : (wordWrap ? "on" : "off") as editor.IStandaloneEditorConstructionOptions["wordWrap"],
     scrollBeyondLastLine: false,
     automaticLayout: true,
     tabSize: 2,
-    lineNumbers: isMobile ? "off" : "on",
+    lineNumbers: isMobile ? "off" : "on" as editor.IStandaloneEditorConstructionOptions["lineNumbers"],
   };
 
   const editorOptions = {

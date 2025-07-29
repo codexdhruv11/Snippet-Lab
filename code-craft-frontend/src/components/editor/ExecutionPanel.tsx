@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Play, Save, CheckCircle2, AlertCircle, Clock, Info, Trash2 } from "lucide-react";
@@ -43,11 +43,15 @@ export function ExecutionPanel({
       };
       setExecutionResults(results);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       // Remove console.error for production
-      const errorMessage = error.response?.data?.error?.message || 
-                          error.message || 
-                          'Failed to execute code. Please try again.';
+      let errorMessage = 'Failed to execute code. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'response' in error) {
+        const apiError = (error as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error;
+        errorMessage = apiError?.message || errorMessage;
+      }
       
       setExecutionResults({
         output: errorMessage,
@@ -56,11 +60,16 @@ export function ExecutionPanel({
       });
       
       // Show toast for better UX
-      if (error.response?.status === 429) {
-        const rateLimitMessage = error.response?.data?.error?.isGuest 
-          ? 'Guest rate limit exceeded. Please sign in for higher limits.'
-          : 'Rate limit exceeded. Please wait a moment before trying again.';
-        toast.error(rateLimitMessage);
+      if (typeof error === 'object' && error !== null && 'response' in error) {
+        const axiosError = error as { response?: { status?: number; data?: { error?: { isGuest?: boolean } } } };
+        if (axiosError.response?.status === 429) {
+          const rateLimitMessage = axiosError.response?.data?.error?.isGuest 
+            ? 'Guest rate limit exceeded. Please sign in for higher limits.'
+            : 'Rate limit exceeded. Please wait a moment before trying again.';
+          toast.error(rateLimitMessage);
+        } else {
+          toast.error(errorMessage);
+        }
       } else {
         toast.error(errorMessage);
       }

@@ -8,11 +8,11 @@ import { Check, X, Clock, Code, ExternalLink } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/authStore";
 import { apiClient } from "@/lib/api";
 import { API_ENDPOINTS, SUPPORTED_LANGUAGES } from "@/lib/constants";
 import { truncateText } from "@/lib/utils";
+import type { Execution, ExecutionsResponse } from "@/types/execution";
 
 export default function ExecutionsPage() {
   const { isAuthenticated } = useAuthStore();
@@ -22,7 +22,7 @@ export default function ExecutionsPage() {
   const [limit] = useState(10);
 
   // Define query but don't execute it yet
-  const executionsQuery = useQuery({
+  const executionsQuery = useQuery<ExecutionsResponse>({
     queryKey: ["executions", page, limit, language],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -83,12 +83,12 @@ export default function ExecutionsPage() {
   };
 
   // Handle re-run code
-  const handleReRunCode = (execution: any) => {
+  const handleReRunCode = (execution: Execution) => {
     router.push(`/editor?language=${execution.language}&code=${encodeURIComponent(execution.code)}`);
   };
 
   // Handle save as snippet
-  const handleSaveAsSnippet = (execution: any) => {
+  const handleSaveAsSnippet = (execution: Execution) => {
     router.push(`/editor?language=${execution.language}&code=${encodeURIComponent(execution.code)}&saveAsSnippet=true`);
   };
 
@@ -152,7 +152,7 @@ export default function ExecutionsPage() {
             </div>
 
             <div className="space-y-4">
-              {executions.map((execution: any) => (
+              {executions.map((execution) => (
                 <Card key={execution._id} className="overflow-hidden">
                   <CardHeader className="flex flex-row items-center justify-between py-4">
                     <CardTitle className="text-base font-medium flex items-center">

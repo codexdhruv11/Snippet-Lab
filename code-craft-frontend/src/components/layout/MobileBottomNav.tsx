@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { Code, BookOpen, User, MoreHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { MobileBottomNavProps } from "@/types/ui";
 
 const navItems = [
   {

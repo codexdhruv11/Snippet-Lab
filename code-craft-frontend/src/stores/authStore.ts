@@ -1,14 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { jwtDecode } from 'jwt-decode';
 import { User } from '@/types/api';
 import { authApi } from '@/lib/api';
-import { STORAGE_KEYS } from '@/lib/constants';
-
-interface DecodedToken {
-  userId: string;
-  exp: number;
-}
 
 interface AuthState {
   token: string | null;
@@ -111,7 +104,7 @@ export const useAuthStore = create<AuthState>()(
           let errorMessage = 'Login failed';
           
           if (error && typeof error === 'object' && 'response' in error) {
-            const axiosError = error as any;
+            const axiosError = error as { response?: { data?: { error?: { message?: string } } }; message?: string };
             errorMessage = axiosError.response?.data?.error?.message || axiosError.message || 'Login failed';
           } else if (error instanceof Error) {
             errorMessage = error.message;

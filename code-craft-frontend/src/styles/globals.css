@@ -63,7 +63,136 @@
   }
 }
 
-/* Base styles */
+/* Comment Thread Styles */
+@layer components {
+  /* Thread line with better contrast and accessibility */
+  .thread-line {
+    position: relative;
+  }
+  
+  .thread-line::before {
+    content: "";
+    position: absolute;
+    left: -1.5rem;
+    border-left: 2px solid hsl(var(--border));
+    height: 100%;
+    top: 0;
+    opacity: 0.6;
+  }
+
+  /* Main comment thread container */
+  .comment-thread {
+    margin-left: 1.5rem;
+    padding-left: 1rem;
+    border-left: 2px solid hsl(var(--border));
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+  }
+  
+  .comment-thread:hover {
+    opacity: 1;
+  }
+
+  /* Responsive indentation for different depths */
+  .comment-indent-1 {
+    margin-left: 1.5rem;
+  }
+
+  .comment-indent-2 {
+    margin-left: 3rem;
+  }
+
+  .comment-indent-3 {
+    margin-left: 4.5rem;
+  }
+  
+  /* Mobile responsive indentation */
+  @media (max-width: 640px) {
+    .comment-indent-1 {
+      margin-left: 1rem;
+    }
+    
+    .comment-indent-2 {
+      margin-left: 2rem;
+    }
+    
+    .comment-indent-3 {
+      margin-left: 3rem;
+    }
+    
+    .comment-thread {
+      margin-left: 1rem;
+      padding-left: 0.5rem;
+    }
+  }
+
+  /* Reply box styling */
+  .reply-box {
+    margin-left: 1.5rem;
+    border-left: 2px solid hsl(var(--border));
+    padding-left: 1rem;
+    margin-top: 0.5rem;
+    opacity: 0.8;
+    transition: all 0.2s ease;
+  }
+  
+  .reply-box:focus-within {
+    opacity: 1;
+    border-left-color: hsl(var(--primary));
+  }
+  
+  /* Improve contrast for dark mode */
+  .dark .thread-line::before,
+  .dark .comment-thread,
+  .dark .reply-box {
+    border-left-color: hsl(var(--border) / 0.5);
+  }
+
+  /* Ensure text is legible and large enough */
+  .comment-thread * {
+    line-height: 1.5;
+    font-size: 1rem;
+    color: hsl(var(--foreground));
+  }
+
+  /* Enhanced focus visibility for accessibility */
+  .comment-thread:focus-within,
+  .reply-box:focus-within {
+    outline: 3px dashed hsl(var(--ring));
+    outline-offset: 4px;
+  }
+  
+  /* Focus styles for keyboard navigation */
+  .comment-thread:focus-within,
+  .reply-box:focus-within {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* Notification Styles */
+.notification-unread {
+  background-color: var(--accent);
+}
+
+.notification-badge {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  background-color: var(--destructive);
+  color: var(--destructive-foreground);
+  height: 1.25rem;
+  width: 1.25rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.notification-badge-large {
+  height: 1.5rem;
+  width: 1.5rem;
+}
 @layer base {
   * {
     @apply border-border;
@@ -217,6 +346,23 @@
   /* Apply Cascadia Code to code blocks */
   .font-code, .cascadia-code {
     font-family: 'Cascadia Code', monospace;
+  }
+
+  /* Contribution Graph Colors */
+  :root {
+    --contribution-level-0: 235 235 235;
+    --contribution-level-1: 155 233 168;
+    --contribution-level-2: 64 196 99;
+    --contribution-level-3: 48 161 78;
+    --contribution-level-4: 33 110 57;
+  }
+
+  .dark {
+    --contribution-level-0: 46 46 46;
+    --contribution-level-1: 14 68 41;
+    --contribution-level-2: 0 109 50;
+    --contribution-level-3: 38 166 65;
+    --contribution-level-4: 57 211 83;
   }
 
   /* Save highlight animation */
@@ -394,6 +540,38 @@
   /* Mobile code toolbar */
   .mobile-code-toolbar {
     @apply fixed bottom-0 left-0 right-0 bg-card border-t border-border p-2 flex items-center justify-between z-30;
+  }
+
+  /* Contribution Graph Styles */
+  .contribution-square {
+    @apply transition-all duration-200;
+  }
+
+  .contribution-square:hover {
+    @apply ring-2 ring-primary ring-offset-1;
+  }
+
+  .contribution-grid {
+    @apply inline-flex gap-[3px];
+  }
+
+  .contribution-week {
+    @apply flex flex-col gap-[3px];
+  }
+
+  /* Responsive contribution graph */
+  @media (max-width: 640px) {
+    .contribution-square {
+      @apply w-[9px] h-[9px];
+    }
+    
+    .contribution-grid {
+      @apply gap-[2px];
+    }
+    
+    .contribution-week {
+      @apply gap-[2px];
+    }
   }
 }
 

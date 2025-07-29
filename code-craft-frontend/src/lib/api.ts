@@ -2,7 +2,15 @@
 
 import axios, { AxiosInstance } from 'axios';
 import { toast } from 'sonner';
-import { API_BASE_URL, API_ENDPOINTS, ERROR_CODES, STORAGE_KEYS } from './constants';
+import { API_BASE_URL, API_ENDPOINTS, ERROR_CODES } from './constants';
+import { 
+  Snippet, 
+  PaginatedResponse, 
+  CreateSnippetRequest, 
+  UpdateSnippetRequest, 
+  PopularTagsResponse,
+  ContributionGraphResponse 
+} from '../types/api';
 
 // Store CSRF token in memory
 let csrfToken: string | null = null;
@@ -27,10 +35,8 @@ const getCsrfToken = async (): Promise<string | null> => {
       withCredentials: true,
     });
     csrfToken = response.data.csrfToken;
-    console.log('CSRF token fetched and stored');
     return csrfToken;
   } catch (error) {
-    console.error('Failed to fetch CSRF token:', error);
     return null;
   }
 };
@@ -51,7 +57,6 @@ const createApiClient = (): AxiosInstance => {
   // Request interceptor for logging and CSRF token
   api.interceptors.request.use(
     async (config) => {
-      console.log('API Request:', config.method?.toUpperCase(), config.url);
       
       // Add CSRF token to headers for state-changing requests
       if (!['GET', 'HEAD', 'OPTIONS'].includes(config.method?.toUpperCase() || '')) {
@@ -60,7 +65,6 @@ const createApiClient = (): AxiosInstance => {
           const token = await getCsrfToken();
           if (token) {
             config.headers['x-csrf-token'] = token;
-            console.log('CSRF token added to request headers');
           } else {
             console.warn('No CSRF token available for request');
           }
@@ -186,13 +190,28 @@ export const userApi = {
     const response = await apiClient.patch(API_ENDPOINTS.USERS.UPDATE, userData);
     return response.data;
   },
+  
+  getContributionGraph: async (userId: string, startDate?: string, endDate?: string): Promise<ContributionGraphResponse> => {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    
+    const response = await apiClient.get(API_ENDPOINTS.USERS.CONTRIBUTION_GRAPH(userId), { params });
+    return response.data;
+  },
 };
 
 /**
  * Snippet API functions
  */
 export const snippetApi = {
-  getSnippets: async (params?: { page?: number; limit?: number; language?: string; search?: string }) => {
+  getSnippets: async (params?: { 
+    page?: number; 
+    limit?: number; 
+    language?: string; 
+    search?: string;
+    tags?: string[];
+  }) => {
     const response = await apiClient.get(API_ENDPOINTS.SNIPPETS.BASE, { params });
     return response.data;
   },
@@ -202,12 +221,12 @@ export const snippetApi = {
     return response.data;
   },
   
-  createSnippet: async (data: { title: string; language: string; code: string; description?: string }) => {
+  createSnippet: async (data: CreateSnippetRequest) => {
     const response = await apiClient.post(API_ENDPOINTS.SNIPPETS.BASE, data);
     return response.data;
   },
   
-  updateSnippet: async (id: string, data: { title?: string; language?: string; code?: string; description?: string }) => {
+  updateSnippet: async (id: string, data: UpdateSnippetRequest) => {
     const response = await apiClient.put(API_ENDPOINTS.SNIPPETS.SINGLE(id), data);
     return response.data;
   },
@@ -221,13 +240,19 @@ export const snippetApi = {
     const response = await apiClient.get(API_ENDPOINTS.SNIPPETS.STARRED, { params });
     return response.data;
   },
+
+  getPopularTags: async (limit?: number) => {
+    const params = limit ? { limit } : {};
+    const response = await apiClient.get(API_ENDPOINTS.TAGS.POPULAR, { params });
+    return response.data;
+  },
 };
 
 /**
  * Comment API functions
  */
 export const commentApi = {
-  getSnippetComments: async (snippetId: string, params?: { page?: number; limit?: number }) => {
+  getComments: async (snippetId: string, params?: { page?: number; limit?: number }) => {
     const response = await apiClient.get(API_ENDPOINTS.COMMENTS.FOR_SNIPPET(snippetId), { params });
     return response.data;
   },
@@ -238,7 +263,7 @@ export const commentApi = {
   },
   
   updateComment: async (commentId: string, content: string) => {
-    const response = await apiClient.put(API_ENDPOINTS.COMMENTS.SINGLE(commentId), { content });
+    const response = await apiClient.patch(API_ENDPOINTS.COMMENTS.SINGLE(commentId), { content });
     return response.data;
   },
   
@@ -249,6 +274,29 @@ export const commentApi = {
   
   getMyComments: async (params?: { page?: number; limit?: number }) => {
     const response = await apiClient.get(API_ENDPOINTS.COMMENTS.MY_COMMENTS, { params });
+    return response.data;
+  },
+  
+  // Threading support
+  getThreadedComments: async (snippetId: string, params?: { page?: number; limit?: number }) => {
+    const response = await apiClient.get(API_ENDPOINTS.COMMENTS.THREADED(snippetId), { params });
+    return response.data;
+  },
+  
+  createReply: async (snippetId: string, parentCommentId: string, content: string) => {
+    const response = await apiClient.post(API_ENDPOINTS.COMMENTS.ADD_REPLY(snippetId, parentCommentId), { content });
+    return response.data;
+  },
+  
+  getReplies: async (commentId: string, page: number = 1, limit: number = 20) => {
+    const response = await apiClient.get(API_ENDPOINTS.COMMENTS.GET_REPLIES(commentId), {
+      params: { page, limit },
+    });
+    return response.data;
+  },
+  
+  getCommentThread: async (commentId: string) => {
+    const response = await apiClient.get(API_ENDPOINTS.COMMENTS.THREAD(commentId));
     return response.data;
   },
 };
@@ -306,4 +354,90 @@ export const executionApi = {
     const response = await apiClient.get(API_ENDPOINTS.EXECUTIONS.STATS);
     return response.data;
   },
-}; 
+};
+
+/**
+ * Follow API functions
+ */
+export const followApi = {
+  toggleFollow: async (userId: string) => {
+    const response = await apiClient.post(API_ENDPOINTS.FOLLOWS.TOGGLE(userId));
+    return response.data;
+  },
+  
+  getFollowers: async (userId: string, page: number = 1, limit: number = 20) => {
+    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWERS(userId), {
+      params: { page, limit },
+    });
+    return response.data;
+  },
+  
+  getFollowing: async (userId: string, page: number = 1, limit: number = 20) => {
+    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWING(userId), {
+      params: { page, limit },
+    });
+    return response.data;
+  },
+  
+  getFollowerCount: async (userId: string) => {
+    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWER_COUNT(userId));
+    return response.data;
+  },
+  
+  getFollowingCount: async (userId: string) => {
+    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWING_COUNT(userId));
+    return response.data;
+  },
+  
+  checkFollowStatus: async (userId: string) => {
+    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.CHECK(userId));
+    return response.data;
+  },
+};
+
+/**
+ * User Search API functions
+ */
+export const userSearchApi = {
+  searchUsers: async (query: string, page: number = 1, limit: number = 20) => {
+    const response = await apiClient.get(API_ENDPOINTS.USER_SEARCH.SEARCH, {
+      params: { q: query, page, limit },
+    });
+    return response.data;
+  },
+};
+
+/**
+ * User Profile API functions
+ */
+export const userProfileApi = {
+  getUserProfile: async (userId: string) => {
+    const response = await apiClient.get(API_ENDPOINTS.USER_PROFILE.PUBLIC(userId));
+    return response.data;
+  },
+};
+
+/**
+ * Notification API functions
+ */
+export const notificationApi = {
+  listNotifications: async (params?: { page?: number; limit?: number; unreadOnly?: boolean }) => {
+    const response = await apiClient.get(API_ENDPOINTS.NOTIFICATIONS.LIST, { params });
+    return response.data;
+  },
+
+  markNotificationRead: async (notificationId: string) => {
+    const response = await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.MARK_READ(notificationId));
+    return response.data;
+  },
+  
+  markAllNotificationsRead: async () => {
+    const response = await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ);
+    return response.data;
+  },
+  
+  getUnreadCount: async () => {
+    const response = await apiClient.get(API_ENDPOINTS.NOTIFICATIONS.UNREAD_COUNT);
+    return response.data;
+  },
+};
