@@ -153,6 +153,11 @@ const startServer = async (): Promise<void> => {
         logger.info('HTTP server closed');
         
         try {
+          // Close cache connection
+          const { cache } = await import('./utils/cache');
+          await cache.close();
+          logger.info('Cache connection closed');
+          
           await disconnectDatabase();
           logger.info('Database connection closed');
           process.exit(0);
