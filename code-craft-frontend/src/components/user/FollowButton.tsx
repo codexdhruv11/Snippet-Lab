@@ -28,11 +28,16 @@ export function FollowButton({
   const queryClient = useQueryClient();
   const [isHovered, setIsHovered] = useState(false);
 
+  // Early return if userId is not provided
+  if (!userId) {
+    return null;
+  }
+
   // Check follow status
   const { data: followStatus, isLoading: isCheckingStatus } = useQuery({
     queryKey: ['follow-status', userId],
     queryFn: () => followApi.checkFollowStatus(userId),
-    enabled: !!currentUser && currentUser._id !== userId,
+    enabled: !!currentUser && !!userId && currentUser._id !== userId,
     initialData: initialFollowState !== undefined ? { isFollowing: initialFollowState } : undefined,
   });
 
