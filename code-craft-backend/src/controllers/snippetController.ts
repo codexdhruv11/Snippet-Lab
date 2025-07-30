@@ -503,7 +503,11 @@ export const getSnippetsByUser = catchAsync(async (req: Request, res: Response):
  */
 export const getPopularTags = catchAsync(async (req: Request, res: Response): Promise<void> => {
   const { limit = 20 } = parsePaginationParams(req);
-  const cacheKey = cacheKeys.popularTags(limit);
+
+  // Validate limit
+  const validatedLimit = Math.min(Math.max(limit, 1), 100);
+
+  const cacheKey = cacheKeys.popularTags(validatedLimit);
   
   // Attempt to get cached popular tags
   const cachedTags = await cache.get(cacheKey);
@@ -511,11 +515,14 @@ export const getPopularTags = catchAsync(async (req: Request, res: Response): Pr
     res.status(HTTP_STATUS.OK).json({
       data: cachedTags,
       total: cachedTags.length,
+      meta: { source: 'cache', queryTime: 0 }
     });
     return;
   }
 
   try {
+    const startTime = Date.now();
+
     // Use aggregation to get tag counts
     const popularTags = await Snippet.aggregate([
       // Match documents that have tags (optimization)
@@ -532,7 +539,7 @@ export const getPopularTags = catchAsync(async (req: Request, res: Response): Pr
       // Sort by count descending
       { $sort: { count: -1 } },
       // Limit results
-      { $limit: limit },
+      { $limit: validatedLimit },
       // Reshape the output
       {
         $project: {
@@ -542,6 +549,9 @@ export const getPopularTags = catchAsync(async (req: Request, res: Response): Pr
         },
       },
     ]).allowDiskUse(true);
+
+    const queryTime = Date.now() - startTime;
+    logger.info(`Popular tags query took ${queryTime}ms`);
 
     // Cache the results
     await cache.set(cacheKey, popularTags, CACHE_TTL.POPULAR_TAGS);
@@ -558,6 +568,7 @@ export const getPopularTags = catchAsync(async (req: Request, res: Response): Pr
     res.status(HTTP_STATUS.OK).json({
       data: popularTags,
       total: popularTags.length,
+      meta: { source: 'db', queryTime }
     });
   } catch (error) {
     // Handle specific aggregation errors
