@@ -1,0 +1,488 @@
+I have created the following plan after thorough exploration and analysis of the codebase. Follow the below plan verbatim. Trust the files and references. Do not re-verify what's written in the plan. Explore only when absolutely necessary. First implement all the proposed file changes and then I'll review all the changes together at the end.
+
+### Observations
+
+I've analyzed the codebase and identified several areas that need improvement for better error messages, retry mechanisms, loading states, and discover page user search functionality:
+
+**Current State Analysis:**
+1. **API Layer**: Has comprehensive error handling with Axios interceptors, but error messages could be more user-friendly
+2. **Discover Page**: Basic search functionality exists but lacks URL integration, proper error handling, and the popular/recent user sections use empty search queries which cause 400 errors
+3. **User Search**: Works but needs better error handling, retry mechanisms, and loading states
+4. **React Query**: Currently has minimal retry configuration (retry: 1) and could benefit from more sophisticated retry strategies
+5. **Error Boundaries**: Basic implementation exists but lacks retry mechanisms and user-friendly fallbacks
+
+**Key Issues Found:**
+- Discover page doesn't read/sync with URL search parameters
+- Popular/recent user sections make invalid empty search queries
+- Missing comprehensive error handling in search components
+- No retry mechanisms in user-facing components
+- Loading states could be more granular and informative
+
+### Approach
+
+I'll implement a comprehensive solution that enhances error handling, retry mechanisms, and user experience across the discover page and user search functionality:
+
+**Strategy:**
+1. **Enhance API Error Handling**: Improve error message parsing and add specific retry logic for different error types
+2. **Fix Discover Page**: Add URL integration, proper error handling, and fix the popular/recent user sections
+3. **Improve Loading States**: Add granular loading indicators and better user feedback
+4. **Add Retry Mechanisms**: Implement user-controlled retry with exponential backoff
+5. **Enhance Error Boundaries**: Add retry capabilities and better fallback UI
+
+**Key Improvements:**
+- URL-aware search with browser history integration
+- Dedicated endpoints or proper handling for popular/recent users
+- Comprehensive error handling with actionable user messages
+- Retry mechanisms with exponential backoff
+- Better loading states and user feedback
+
+### Reasoning
+
+I explored the repository structure and read key files including the discover page, user search components, API layer, error handling utilities, and backend controllers. I analyzed the current implementation of user search functionality, error handling patterns, React Query configuration, and identified gaps in error handling, retry mechanisms, and user experience. I found that while the backend has good error handling, the frontend needs improvements in surfacing errors to users and providing retry mechanisms.
+
+## Mermaid Diagram
+
+sequenceDiagram
+    participant User as User
+    participant DiscoverPage as Discover Page
+    participant UserList as UserList Component
+    participant API as Frontend API
+    participant Backend as Backend Controller
+    participant ErrorBoundary as Error Boundary
+    participant ReactQuery as React Query
+
+    User->>DiscoverPage: Visits /discover?q=search_term
+    DiscoverPage->>DiscoverPage: Read search params from URL
+    DiscoverPage->>ReactQuery: useQuery with search term
+    ReactQuery->>API: userSearchApi.searchUsers(query, page)
+    
+    alt Successful Search
+        API->>Backend: GET /users/search?q=term&page=1
+        Backend->>Backend: Validate query and pagination
+        Backend->>Backend: Search users with text/regex search
+        Backend-->>API: {data: users[], pagination: {...}}
+        API-->>ReactQuery: Validated response
+        ReactQuery-->>DiscoverPage: Search results
+        DiscoverPage->>UserList: Pass users, loading, error states
+        UserList-->>User: Display user cards with follow buttons
+    end
+    
+    alt Network/API Error
+        API->>API: Catch error and enhance message
+        API-->>ReactQuery: Enhanced error with context
+        ReactQuery-->>DiscoverPage: Error state
+        DiscoverPage->>UserList: Pass error and retry function
+        UserList->>UserList: Show error banner with retry button
+        User->>UserList: Clicks retry button
+        UserList->>DiscoverPage: Call onRetry()
+        DiscoverPage->>ReactQuery: Call refetch()
+        Note over ReactQuery: Retry with exponential backoff
+    end
+    
+    alt Popular/Recent Users
+        DiscoverPage->>API: getPopularUsers() / getRecentUsers()
+        API->>Backend: GET /users/popular or /users/recent
+        Backend->>Backend: Query users by follower count or date
+        Backend-->>API: Cached response with user data
+        API-->>DiscoverPage: Popular/recent users
+        DiscoverPage->>UserList: Display in separate sections
+    end
+    
+    alt Component Error (React Error)
+        UserList->>ErrorBoundary: Component throws error
+        ErrorBoundary->>ErrorBoundary: Catch error and classify type
+        ErrorBoundary->>ErrorBoundary: Show error UI with retry
+        User->>ErrorBoundary: Clicks retry button
+        ErrorBoundary->>ErrorBoundary: Reset error state
+        ErrorBoundary->>UserList: Re-render component
+    end
+    
+    alt URL State Management
+        User->>DiscoverPage: Types in search input
+        DiscoverPage->>DiscoverPage: Update search state
+        DiscoverPage->>DiscoverPage: Update URL with router.replace
+        DiscoverPage->>ReactQuery: Trigger new search query
+        Note over DiscoverPage: Debounced search with URL sync
+    end
+    
+    alt Load More Pagination
+        User->>UserList: Clicks "Load More" button
+        UserList->>DiscoverPage: Call onLoadMore()
+        DiscoverPage->>DiscoverPage: Increment page number
+        DiscoverPage->>ReactQuery: Query next page
+        ReactQuery->>API: searchUsers(query, page + 1)
+        API-->>ReactQuery: Additional results
+        ReactQuery->>ReactQuery: Merge with existing data
+        ReactQuery-->>UserList: Updated user list
+        UserList-->>User: Show additional users
+    end
+
+## Proposed File Changes
+
+### code-craft-frontend\src\lib\api.ts(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\types\api.ts
+- code-craft-backend\src\controllers\userController.ts(MODIFY)
+
+Enhance the user search API with better error handling and retry mechanisms:
+
+1. **Improve userSearchApi.searchUsers**: Add comprehensive error handling with specific error messages for different scenarios:
+   - Add try-catch wrapper around the API call
+   - Handle 400 status codes with specific validation error messages
+   - Handle 429 rate limiting with retry-after information
+   - Handle network timeouts with user-friendly messages
+   - Add request validation for query parameters
+
+2. **Add Response Validation**: Validate the API response structure to ensure it matches expected format:
+   - Check if response.data exists and has expected structure
+   - Validate pagination object exists and has required fields
+   - Handle cases where backend response format might change
+
+3. **Add Request Timeout**: Set appropriate timeout for search requests (10 seconds) to prevent hanging requests
+
+4. **Enhance Error Context**: Provide more detailed error information:
+   - Include the search query in error context for debugging
+   - Add error codes for different failure types
+   - Provide actionable error messages for users
+
+5. **Add Popular/Recent User APIs**: Create dedicated API functions for popular and recent users to avoid empty search queries:
+   - `getPopularUsers(limit)` - users sorted by follower count
+   - `getRecentUsers(limit)` - users sorted by registration date
+   - These will call dedicated backend endpoints or use proper query parameters
+
+These improvements will make the search API more robust and provide better error handling for various edge cases.
+
+### code-craft-frontend\src\app\discover\page.tsx(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\lib\api.ts(MODIFY)
+- code-craft-frontend\src\components\user\UserList.tsx(MODIFY)
+
+Transform the discover page into a comprehensive user search experience with URL integration and proper error handling:
+
+1. **Add URL Integration**: Use Next.js App Router's `useSearchParams` and `useRouter` to read and sync search state with URL:
+   - Read initial search query from `?q=` parameter
+   - Update URL when search query changes using `router.replace`
+   - Maintain browser history for search navigation
+
+2. **Fix Search Query Management**: Properly handle search state and pagination:
+   - Include both `debouncedSearchQuery` and `searchPage` in React Query key
+   - Reset page to 1 when search query changes
+   - Implement proper pagination that accumulates results for "Load More"
+
+3. **Add Comprehensive Error Handling**: Create error UI sections for each query:
+   - Add error banners with specific error messages
+   - Include retry buttons that call `refetch()` for each query
+   - Handle different error types (network, validation, rate limiting)
+   - Show appropriate fallback content when errors occur
+
+4. **Improve Loading States**: Enhance loading indicators:
+   - Pass `isLoading` for initial load and `isLoadingMore` for pagination
+   - Show skeleton states during initial load
+   - Show loading indicators on retry buttons
+
+5. **Fix Popular/Recent User Sections**: Replace empty search queries with proper API calls:
+   - Use dedicated `getPopularUsers()` and `getRecentUsers()` API functions
+   - Add proper error handling for these sections
+   - Show appropriate empty states when no data is available
+
+6. **Add React Query Configuration**: Configure queries with appropriate retry and caching strategies:
+   - Use `keepPreviousData: true` for search pagination
+   - Set appropriate `staleTime` for popular/recent user data
+   - Configure retry logic with exponential backoff
+
+These changes will create a robust, user-friendly discover page with proper error handling and retry mechanisms.
+
+### code-craft-frontend\src\components\user\UserList.tsx(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\components\ui\button.tsx
+- code-craft-frontend\src\components\ui\skeleton.tsx
+
+Enhance UserList component with comprehensive error handling and improved loading states:
+
+1. **Add Error Handling Props**: Extend the component interface to handle errors:
+   - Add `error?: Error | null` prop for error state
+   - Add `onRetry?: () => void` prop for retry functionality
+   - Add `retryLoading?: boolean` prop for retry button loading state
+
+2. **Create Error UI Section**: Add error display component:
+   - Show error banner with user-friendly error message
+   - Include retry button that calls `onRetry` when provided
+   - Display different error types appropriately (network, validation, etc.)
+   - Add error icon and proper styling for error states
+
+3. **Improve Loading States**: Enhance loading indicators:
+   - Show skeleton cards during initial loading
+   - Add loading indicators for "Load More" button
+   - Show loading state on retry button when `retryLoading` is true
+   - Ensure loading states don't interfere with existing data display
+
+4. **Add Accessibility**: Improve accessibility for error and loading states:
+   - Add proper ARIA labels for error messages and retry buttons
+   - Ensure error messages are announced to screen readers
+   - Add proper focus management for retry interactions
+
+5. **Enhance Empty States**: Improve empty state messaging:
+   - Provide more contextual empty messages based on the type of user list
+   - Add suggestions for users when no results are found
+   - Include call-to-action buttons for empty states
+
+6. **Add Error Recovery**: Implement smart error recovery:
+   - Clear error state when new data is successfully loaded
+   - Handle partial failures gracefully
+   - Maintain user's scroll position during retry operations
+
+These improvements will make UserList more robust and provide better user experience during error scenarios.
+
+### code-craft-frontend\src\components\user\UserSearchModal.tsx(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\lib\api.ts(MODIFY)
+- code-craft-frontend\src\components\user\UserCard.tsx
+
+Enhance UserSearchModal with better error handling and retry mechanisms:
+
+1. **Add Comprehensive Error Handling**: Improve error display and recovery:
+   - Add error state section that shows when `error` is truthy
+   - Display user-friendly error messages based on error type
+   - Include retry button that calls `refetch()` from the query
+   - Handle different error scenarios (network, validation, rate limiting)
+
+2. **Improve Loading States**: Enhance loading indicators:
+   - Show loading state during retry operations
+   - Add loading indicators that don't interfere with existing results
+   - Ensure smooth transitions between loading and error states
+
+3. **Add Retry Mechanism**: Implement user-controlled retry:
+   - Add retry button in error state that calls query `refetch()`
+   - Show loading state on retry button during retry operation
+   - Clear error state when retry is successful
+   - Add retry count limitation to prevent infinite retries
+
+4. **Enhance Query Configuration**: Improve React Query configuration for the search:
+   - Add appropriate retry configuration with exponential backoff
+   - Set proper `staleTime` for search results
+   - Use `keepPreviousData` to maintain results during new searches
+
+5. **Improve Error Messages**: Provide more specific error feedback:
+   - Parse error response to show specific validation errors
+   - Handle rate limiting with appropriate messaging
+   - Show network error messages with troubleshooting tips
+   - Add context about what went wrong and how to fix it
+
+6. **Add Accessibility**: Improve accessibility for error states:
+   - Add proper ARIA labels for error messages and retry buttons
+   - Ensure error announcements for screen readers
+   - Maintain focus management during error and retry states
+
+These improvements will make the search modal more resilient and provide better user experience during error scenarios.
+
+### code-craft-frontend\src\components\providers\react-query-provider.tsx(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\lib\api.ts(MODIFY)
+
+Enhance React Query configuration with better retry strategies and error handling:
+
+1. **Improve Default Query Configuration**: Enhance the default options for better error handling:
+   - Increase retry count to 2 for better resilience
+   - Add exponential backoff retry delay: `retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)`
+   - Set appropriate `staleTime` based on data type (longer for user data)
+   - Configure `refetchOnWindowFocus` to be more intelligent
+
+2. **Add Query-Specific Configurations**: Create different configurations for different types of queries:
+   - Search queries: shorter stale time, fewer retries
+   - User profile queries: longer stale time, more retries
+   - Popular/recent data: longer stale time, cached longer
+
+3. **Add Global Error Handling**: Implement global query error handling:
+   - Add `onError` callback to log errors for monitoring
+   - Handle authentication errors globally
+   - Add error recovery strategies for common error types
+
+4. **Improve Cache Configuration**: Optimize caching strategies:
+   - Set appropriate `gcTime` (garbage collection time) for different data types
+   - Configure `staleTime` based on data volatility
+   - Add cache invalidation strategies for related data
+
+5. **Add Development Tools**: Enhance development experience:
+   - Configure React Query Devtools with better default settings
+   - Add error boundary integration for query errors
+   - Add performance monitoring for slow queries
+
+6. **Add Network Status Handling**: Improve offline/online behavior:
+   - Configure retry behavior based on network status
+   - Add appropriate error messages for offline scenarios
+   - Handle network recovery gracefully
+
+These improvements will provide better default behavior for all queries and improve overall application resilience.
+
+### code-craft-frontend\src\components\common\ErrorBoundary.tsx(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\components\ui\button.tsx
+- code-craft-frontend\src\components\ui\card.tsx
+
+Transform the basic ErrorBoundary into a comprehensive error handling component with retry mechanisms:
+
+1. **Add Retry Functionality**: Implement retry mechanism for error recovery:
+   - Add `retry` method that resets error state and re-renders children
+   - Add retry button in the error UI that calls the retry method
+   - Track retry count to prevent infinite retry loops
+   - Add exponential backoff for automatic retries
+
+2. **Enhance Error Classification**: Improve error categorization and handling:
+   - Classify errors by type (network, validation, rendering, etc.)
+   - Provide different UI and recovery strategies for different error types
+   - Add error context information for better debugging
+   - Include component stack trace in error reporting
+
+3. **Improve Error UI**: Create more user-friendly error displays:
+   - Add different error layouts for different error types
+   - Include actionable error messages with recovery suggestions
+   - Add error icons and better visual hierarchy
+   - Provide contact information or help links for persistent errors
+
+4. **Add Error Reporting**: Implement error tracking and reporting:
+   - Add hooks for error tracking services (console.error for now)
+   - Include user context and application state in error reports
+   - Add error fingerprinting for duplicate error detection
+   - Log error recovery attempts and success rates
+
+5. **Add Specialized Error Boundaries**: Create specific error boundaries for different components:
+   - `SearchErrorBoundary` for search-related components
+   - `UserProfileErrorBoundary` for user profile components
+   - Each with specialized error handling and recovery strategies
+
+6. **Improve State Management**: Enhance error state handling:
+   - Add error state persistence across component re-renders
+   - Clear error state when navigation occurs
+   - Handle error state cleanup on component unmount
+   - Add error state sharing between related components
+
+These improvements will provide comprehensive error handling with user-friendly recovery mechanisms.
+
+### code-craft-backend\src\controllers\userController.ts(MODIFY)
+
+References: 
+
+- code-craft-backend\src\utils\constants.ts
+- code-craft-backend\src\utils\cache.ts
+
+Enhance the backend user controller with better error handling and new endpoints for popular/recent users:
+
+1. **Improve searchUsers Error Handling**: Enhance error responses with more specific information:
+   - Add detailed validation error messages for different parameter failures
+   - Include error codes for different types of validation failures
+   - Add request context (query, pagination) to error logs
+   - Provide suggestions in error messages for fixing invalid requests
+
+2. **Add Popular Users Endpoint**: Create dedicated endpoint for popular users:
+   - Add `getPopularUsers` function that returns users sorted by follower count
+   - Include proper pagination and limit validation
+   - Add caching for popular users data (5-minute cache)
+   - Return consistent response format with search results
+
+3. **Add Recent Users Endpoint**: Create dedicated endpoint for recently joined users:
+   - Add `getRecentUsers` function that returns users sorted by registration date
+   - Include proper pagination and limit validation
+   - Add caching for recent users data (5-minute cache)
+   - Return consistent response format with search results
+
+4. **Enhance Search Query Handling**: Improve search query processing:
+   - Allow empty queries when specific sort parameters are provided
+   - Add better sanitization for search queries
+   - Improve text search fallback when text index is not available
+   - Add query performance monitoring and logging
+
+5. **Add Rate Limiting Context**: Improve rate limiting error responses:
+   - Include rate limit information in error responses
+   - Add retry-after headers for rate limited requests
+   - Provide specific error messages for rate limiting scenarios
+   - Log rate limiting events for monitoring
+
+6. **Improve Response Consistency**: Ensure all endpoints return consistent response formats:
+   - Standardize error response structure across all endpoints
+   - Ensure pagination format is consistent
+   - Add response validation to prevent malformed responses
+   - Include metadata about query performance and caching
+
+These improvements will provide better error handling and dedicated endpoints for the frontend to use.
+
+### code-craft-backend\src\routes\userRoutes.ts(MODIFY)
+
+References: 
+
+- code-craft-backend\src\controllers\userController.ts(MODIFY)
+- code-craft-backend\src\middleware\validation.ts
+
+Add new routes for popular and recent users to support the enhanced discover page functionality:
+
+1. **Add Popular Users Route**: Create route for popular users endpoint:
+   - Add `GET /users/popular` route that calls `userController.getPopularUsers`
+   - Include proper rate limiting for this endpoint
+   - Add validation middleware for query parameters (limit, page)
+   - Include caching headers for better performance
+
+2. **Add Recent Users Route**: Create route for recent users endpoint:
+   - Add `GET /users/recent` route that calls `userController.getRecentUsers`
+   - Include proper rate limiting for this endpoint
+   - Add validation middleware for query parameters (limit, page)
+   - Include caching headers for better performance
+
+3. **Update Existing Routes**: Enhance existing user routes with better error handling:
+   - Add more specific validation middleware for search routes
+   - Include better error handling middleware
+   - Add request logging for debugging purposes
+   - Ensure consistent response format across all routes
+
+4. **Add Route Documentation**: Include proper documentation for new routes:
+   - Add JSDoc comments for new route handlers
+   - Document expected query parameters and response formats
+   - Include example requests and responses
+   - Add error response documentation
+
+These route additions will provide the backend endpoints needed for the enhanced discover page functionality.
+
+### code-craft-frontend\src\lib\constants.ts(MODIFY)
+
+References: 
+
+- code-craft-frontend\src\lib\api.ts(MODIFY)
+
+Update API constants to include new endpoints and error handling configurations:
+
+1. **Add New API Endpoints**: Include endpoints for popular and recent users:
+   - Add `USER_SEARCH.POPULAR: '/users/popular'` for popular users endpoint
+   - Add `USER_SEARCH.RECENT: '/users/recent'` for recent users endpoint
+   - Ensure consistent naming convention with existing endpoints
+
+2. **Add Error Message Constants**: Create constants for common error messages:
+   - Add `SEARCH_ERRORS` object with common search error messages
+   - Include `NETWORK_ERROR`, `VALIDATION_ERROR`, `RATE_LIMIT_ERROR` constants
+   - Add `RETRY_MESSAGES` for different retry scenarios
+
+3. **Add Retry Configuration Constants**: Define retry behavior constants:
+   - Add `RETRY_CONFIG` with default retry counts and delays
+   - Include `MAX_RETRY_ATTEMPTS` and `RETRY_DELAY_BASE` constants
+   - Add `SEARCH_TIMEOUT` and other timeout configurations
+
+4. **Update API Limits**: Enhance API limits for search functionality:
+   - Add `MAX_SEARCH_QUERY_LENGTH` for search input validation
+   - Include `SEARCH_DEBOUNCE_DELAY` for search input debouncing
+   - Add `POPULAR_USERS_CACHE_TIME` and `RECENT_USERS_CACHE_TIME`
+
+5. **Add Loading State Constants**: Define loading state configurations:
+   - Add `LOADING_DELAYS` for different loading scenarios
+   - Include `SKELETON_COUNT` for skeleton loading states
+   - Add `PAGINATION_THRESHOLD` for load more functionality
+
+These constants will provide centralized configuration for the enhanced search functionality.
