@@ -62,15 +62,16 @@ jest.setTimeout(60000); // 60 seconds
 // Database connection functions for tests
 export const connectTestDatabase = async () => {
   try {
+    // Set environment variable to skip MD5 check
+    process.env.MONGOMS_SKIP_MD5_CHECK = '1';
+    process.env.MONGOMS_DOWNLOAD_DIR = './.mongo-binaries';
+    process.env.MONGOMS_VERSION = '5.0.5';
+    
     mongoServer = await MongoMemoryServer.create({
       instance: {
         dbName: 'test',
         port: 27018, // Use a different port to avoid conflicts
         storageEngine: 'wiredTiger',
-      },
-      binary: {
-        version: '5.0.5', // Specify a stable version
-        downloadDir: './.mongo-binaries', // Cache binaries for faster startup
       },
     });
     
