@@ -7,6 +7,8 @@ import {
   changePassword,
   searchUsers,
   getContributionGraph,
+  getPopularUsers,
+  getRecentUsers,
 } from '../controllers/userController';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { validateUserUpdate, validateObjectId, validatePasswordChange, validatePagination, validateUserSearch, validateContributionGraph } from '../middleware/validation';
@@ -38,5 +40,11 @@ router.get('/:id/profile', validateObjectId('id'), getUserProfile);
 
 // Get user contribution graph (public)
 router.get('/:id/contribution-graph', validateObjectId('id'), optionalAuth, validateContributionGraph, getContributionGraph);
+
+// Get popular users (public)
+router.get('/popular', validatePagination, getPopularUsers);
+
+// Get recent users (public)
+router.get('/recent', validatePagination, getRecentUsers);
 
 export default router;
