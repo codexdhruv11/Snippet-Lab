@@ -5,12 +5,14 @@ import { IUser } from './User';
 export class FollowError extends Error {
   public code: string;
   public statusCode: number;
+  public context?: Record<string, any>;
 
-  constructor(message: string, code: string = 'FOLLOW_ERROR', statusCode: number = 400) {
+  constructor(message: string, code: string = 'FOLLOW_ERROR', statusCode: number = 400, context?: Record<string, any>) {
     super(message);
     this.name = 'FollowError';
     this.code = code;
     this.statusCode = statusCode;
+    this.context = context;
   }
 }
 
@@ -153,19 +155,26 @@ followSchema.statics.toggle = async function (
 ): Promise<{ isFollowing: boolean; followerCount: number }> {
   const session = await mongoose.startSession();
   session.startTransaction();
+  const startTime = Date.now();
 
   try {
     // Validate ObjectId formats
+    if (!followerId || typeof followerId !== 'string') {
+      throw new FollowError('Follower ID is required', 'INVALID_FOLLOWER_ID', 400, { followerId });
+    }
+    if (!followingId || typeof followingId !== 'string') {
+      throw new FollowError('Following ID is required', 'INVALID_FOLLOWING_ID', 400, { followingId });
+    }
     if (!mongoose.Types.ObjectId.isValid(followerId)) {
-      throw new FollowError('Invalid follower ID format', 'INVALID_FOLLOWER_ID', 400);
+      throw new FollowError('Invalid follower ID format', 'INVALID_FOLLOWER_ID', 400, { followerId });
     }
     if (!mongoose.Types.ObjectId.isValid(followingId)) {
-      throw new FollowError('Invalid following ID format', 'INVALID_FOLLOWING_ID', 400);
+      throw new FollowError('Invalid following ID format', 'INVALID_FOLLOWING_ID', 400, { followingId });
     }
     
     // Prevent self-following at the model level
     if (followerId === followingId) {
-      throw new FollowError('Users cannot follow themselves', 'SELF_FOLLOW_NOT_ALLOWED', 400);
+      throw new FollowError('Cannot follow yourself', 'SELF_FOLLOW_NOT_ALLOWED', 400, { userId: followerId });
     }
 
     // First, check if the follow relationship exists
@@ -214,7 +223,11 @@ followSchema.statics.toggle = async function (
         await countSession.abortTransaction();
         countSession.endSession();
         // If we can't get the count, throw the original error
-        throw new FollowError('Failed to toggle follow relationship', 'TOGGLE_FOLLOW_ERROR', 500);
+        throw new FollowError('Failed to toggle follow relationship', 'TOGGLE_FOLLOW_ERROR', 500, {
+          followerId,
+          followingId,
+          duration: Date.now() - startTime,
+        });
       }
     }
     
@@ -222,7 +235,12 @@ followSchema.statics.toggle = async function (
     if (error instanceof FollowError) {
       throw error;
     }
-    throw new FollowError('Failed to toggle follow relationship', 'TOGGLE_FOLLOW_ERROR', 500);
+    throw new FollowError('Failed to toggle follow relationship', 'TOGGLE_FOLLOW_ERROR', 500, {
+      followerId,
+      followingId,
+      duration: Date.now() - startTime,
+      originalError: error.message,
+    });
   }
 };
 
