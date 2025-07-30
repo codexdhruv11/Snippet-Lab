@@ -78,11 +78,17 @@ export default function CreateSnippetPage() {
     },
     onError: (error: unknown) => {
       let errorMessage = "Failed to create snippet";
+      let tagErrors = [];
       
       if (error && typeof error === 'object' && 'response' in error) {
         const apiError = (error as { response?: { data?: { error?: { details?: Array<{ msg: string }>, message?: string } } } })?.response?.data?.error;
         if (apiError?.details && Array.isArray(apiError.details)) {
           // Handle validation errors
+          apiError.details.forEach((detail) => {
+            if (detail.msg.includes('Tag')) {
+              tagErrors.push(detail.msg);
+            }
+          });
           errorMessage = apiError.details.map((detail) => detail.msg).join(", ");
         } else if (apiError?.message) {
           errorMessage = apiError.message;
@@ -91,7 +97,12 @@ export default function CreateSnippetPage() {
         errorMessage = error.message;
       }
       
-      toast.error(errorMessage);
+      if (tagErrors.length > 0) {
+        setTags([]); // Clear invalid tags
+        toast.error(`Tag errors: ${tagErrors.join(", ")}`);
+      } else {
+        toast.error(errorMessage);
+      }
     },
   });
   
