@@ -11,7 +11,12 @@ import { notifyOnFollow } from '../utils/notificationHelper';
 // Helper function to transform FollowError to AppError
 const transformFollowError = (error: any): AppError => {
   if (error instanceof FollowError) {
+    logger.debug(`FollowError transformed - message: ${error.message}, code: ${error.code}`);
     return new AppError(error.message, error.statusCode, error.code);
+  }
+  if (error.name === 'MongoServerError' && error.code === 11000) {
+    logger.debug('Duplicate key error in follow operation');
+    return new AppError('Follow relationship already exists', HTTP_STATUS.CONFLICT, ERROR_CODES.DUPLICATE_ENTRY);
   }
   return error;
 };
@@ -19,14 +24,18 @@ const transformFollowError = (error: any): AppError => {
 // Helper function to validate user existence and ObjectId format
 const validateUserExists = async (userId: string): Promise<IUser> => {
   // Validate ObjectId format
+  if (!userId || typeof userId !== 'string') {
+    throw new AppError('Invalid user ID: ID must be provided', HTTP_STATUS.BAD_REQUEST, ERROR_CODES.VALIDATION_ERROR);
+  }
+
   if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new AppError('Invalid user ID format', HTTP_STATUS.BAD_REQUEST, ERROR_CODES.VALIDATION_ERROR);
+    throw new AppError(`Invalid user ID format: ${userId}`, HTTP_STATUS.BAD_REQUEST, ERROR_CODES.VALIDATION_ERROR);
   }
 
   // Check if user exists
   const user = await UserModel.findById(userId);
   if (!user) {
-    throw new AppError('User not found', HTTP_STATUS.NOT_FOUND, ERROR_CODES.NOT_FOUND);
+    throw new AppError(`User not found with ID: ${userId}`, HTTP_STATUS.NOT_FOUND, ERROR_CODES.NOT_FOUND);
   }
 
   return user;
@@ -37,22 +46,33 @@ export const toggleFollow = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const { id: targetUserId } = req.params;
     const followerId = req.user!.id;
+    const startTime = Date.now();
+
+    // Log incoming request
+    logger.debug(`Follow toggle request - followerId: ${followerId}, targetUserId: ${targetUserId}`);
 
     // Prevent self-following
     if (followerId === targetUserId) {
+      logger.warn(`Self-follow attempt - userId: ${followerId}`);
       return next(
-        new AppError('You cannot follow yourself', HTTP_STATUS.BAD_REQUEST, ERROR_CODES.VALIDATION_ERROR)
+        new AppError('Cannot follow yourself', HTTP_STATUS.BAD_REQUEST, ERROR_CODES.VALIDATION_ERROR)
       );
     }
 
     // Validate target user exists
-    await validateUserExists(targetUserId);
+    try {
+      await validateUserExists(targetUserId);
+    } catch (error) {
+      logger.error(`User validation failed - targetUserId: ${targetUserId}, error: ${error.message}`);
+      throw error;
+    }
 
     // Toggle follow
     try {
       const result = await FollowModel.toggle(followerId, targetUserId);
+      const duration = Date.now() - startTime;
 
-      logger.info(`User ${followerId} ${result.isFollowing ? 'followed' : 'unfollowed'} user ${targetUserId}`);
+      logger.info(`User ${followerId} ${result.isFollowing ? 'followed' : 'unfollowed'} user ${targetUserId} - duration: ${duration}ms`);
 
       // Create notification for new follow
       if (result.isFollowing) {
@@ -63,11 +83,15 @@ export const toggleFollow = catchAsync(
       }
 
       res.status(HTTP_STATUS.OK).json({
+        success: true,
         message: result.isFollowing ? 'User followed successfully' : 'User unfollowed successfully',
         isFollowing: result.isFollowing,
         followerCount: result.followerCount,
+        timestamp: new Date().toISOString(),
+        requestId: req.id || 'unknown',
       });
     } catch (error) {
+      logger.error(`Follow toggle failed - followerId: ${followerId}, targetUserId: ${targetUserId}, error: ${error.message}`);
       throw transformFollowError(error);
     }
   }
