@@ -412,7 +412,7 @@ export const searchUsers = catchAsync(async (req: Request, res: Response): Promi
       enrichedUsers = users.map(user => {
         const userWithCounts = userCountsMap.get(user._id.toString());
         return {
-          id: user._id,
+          _id: user._id,
           name: user.name,
           bio: user.bio || null,
           createdAt: user.createdAt,
@@ -423,7 +423,7 @@ export const searchUsers = catchAsync(async (req: Request, res: Response): Promi
     } else {
       // For unauthenticated users, return same structure with 0 counts
       enrichedUsers = users.map(user => ({
-        id: user._id,
+        _id: user._id,
         name: user.name,
         bio: user.bio || null,
         createdAt: user.createdAt,
