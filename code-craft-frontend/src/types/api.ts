@@ -196,7 +196,12 @@ export interface UpdateSnippetRequest {
  * Popular tags response
  */
 export interface PopularTagsResponse {
-  tags: TagData[];
+  data: TagData[];
+  total: number;
+  meta?: {
+    source: 'cache' | 'db';
+    queryTime: number;
+  };
 }
 
 /**
@@ -212,6 +217,13 @@ export interface ContributionDay {
  */
 export interface ContributionGraphResponse {
   data: ContributionDay[];
+  meta?: {
+    startDate?: string;
+    endDate?: string;
+    totalDays?: number;
+    activeDays?: number;
+    totalContributions?: number;
+  };
 }
 
 /**

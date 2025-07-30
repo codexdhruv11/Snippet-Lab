@@ -56,15 +56,17 @@ export const API_ENDPOINTS = {
     STATS: (snippetId: string) => `/snippets/${snippetId}/stars/stats`,
   },
   FOLLOWS: {
-    TOGGLE: (userId: string) => `/users/${userId}/follow`,
+    TOGGLE: (userId: string) => `/users/${userId}/follows`,
+    CHECK: (userId: string) => `/users/${userId}/follows/me`,
     FOLLOWERS: (userId: string) => `/users/${userId}/followers`,
     FOLLOWING: (userId: string) => `/users/${userId}/following`,
     FOLLOWER_COUNT: (userId: string) => `/users/${userId}/followers/count`,
     FOLLOWING_COUNT: (userId: string) => `/users/${userId}/following/count`,
-    CHECK: (userId: string) => `/users/${userId}/follow/me`,
   },
   USER_SEARCH: {
     SEARCH: '/users/search',
+    POPULAR: '/users/popular',
+    RECENT: '/users/recent',
   },
   USER_PROFILE: {
     PUBLIC: (userId: string) => `/users/${userId}/profile`,
@@ -386,4 +388,33 @@ print(greet("SnippetLab"))
 // Array manipulation
 let numbers = (1...5).map { $0 * $0 }
 print("Squares: \\(numbers)")`
+};
+
+/**
+ * Error Messages
+ */
+export const ERROR_MESSAGES = {
+  NETWORK_ERROR: 'Network error. Please check your connection.',
+  SERVER_ERROR: 'Server error. Please try again later.',
+  RATE_LIMIT: 'Too many requests. Please try again later.',
+  TIMEOUT: 'Request timed out. Please try again.',
+  UNAUTHORIZED: 'You need to be logged in to perform this action.',
+  FORBIDDEN: 'You do not have permission to perform this action.',
+  NOT_FOUND: 'The requested resource was not found.',
+  VALIDATION_ERROR: 'Please check your input and try again.',
+  UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.',
+  SEARCH_ERROR: 'Failed to search users. Please try again.',
+  POPULAR_USERS_ERROR: 'Failed to fetch popular users. Please try again.',
+  RECENT_USERS_ERROR: 'Failed to fetch recent users. Please try again.',
+};
+
+/**
+ * Retry Configuration
+ */
+export const RETRY_CONFIG = {
+  MAX_RETRIES: 3,
+  INITIAL_DELAY: 1000, // 1 second
+  MAX_DELAY: 10000, // 10 seconds
+  BACKOFF_FACTOR: 2,
+  RETRY_ON: [408, 429, 500, 502, 503, 504], // HTTP status codes to retry on
 };

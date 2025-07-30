@@ -1,14 +1,39 @@
-import { format, eachDayOfInterval, startOfWeek, endOfWeek, getDay, getMonth, startOfYear, endOfYear, subDays } from 'date-fns';
+import { format, eachDayOfInterval, startOfWeek, endOfWeek, getDay, getMonth, startOfYear, endOfYear, subDays, isValid } from 'date-fns';
+
+/**
+ * Validate that a value is a valid number
+ */
+function isValidNumber(value: any): value is number {
+  return typeof value === 'number' && !isNaN(value) && isFinite(value);
+}
+
+/**
+ * Validate that a date string or Date object is valid
+ */
+function isValidDate(date: any): boolean {
+  if (!date) return false;
+  const dateObj = date instanceof Date ? date : new Date(date);
+  return isValid(dateObj) && !isNaN(dateObj.getTime());
+}
 
 /**
  * Get contribution level based on count (0-4)
  * 0 = no activity, 1 = low, 2 = medium, 3 = high, 4 = very high
  */
 export function getContributionLevel(count: number): number {
-  if (count === 0) return 0;
-  if (count <= 2) return 1;
-  if (count <= 4) return 2;
-  if (count <= 6) return 3;
+  // Validate input
+  if (!isValidNumber(count) || count < 0) {
+    console.warn('Invalid count provided to getContributionLevel:', count);
+    return 0;
+  }
+  
+  // Ensure count is an integer
+  const safeCount = Math.floor(count);
+  
+  if (safeCount === 0) return 0;
+  if (safeCount <= 2) return 1;
+  if (safeCount <= 4) return 2;
+  if (safeCount <= 6) return 3;
   return 4;
 }
 
@@ -16,6 +41,15 @@ export function getContributionLevel(count: number): number {
  * Get CSS class for contribution level
  */
 export function getContributionColor(level: number): string {
+  // Validate input
+  if (!isValidNumber(level)) {
+    console.warn('Invalid level provided to getContributionColor:', level);
+    level = 0;
+  }
+  
+  // Clamp level between 0 and 4
+  const safeLevel = Math.max(0, Math.min(4, Math.floor(level)));
+  
   const colors = {
     0: 'bg-muted hover:bg-muted/80',
     1: 'bg-green-200 dark:bg-green-900 hover:bg-green-300 dark:hover:bg-green-800',
@@ -23,25 +57,62 @@ export function getContributionColor(level: number): string {
     3: 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-400',
     4: 'bg-green-800 dark:bg-green-300 hover:bg-green-900 dark:hover:bg-green-200',
   };
-  return colors[level as keyof typeof colors] || colors[0];
+  return colors[safeLevel as keyof typeof colors] || colors[0];
 }
 
 /**
  * Generate date range array
  */
 export function generateDateRange(startDate: Date, endDate: Date): Date[] {
-  return eachDayOfInterval({ start: startDate, end: endDate });
+  // Validate inputs
+  if (!isValidDate(startDate) || !isValidDate(endDate)) {
+    console.warn('Invalid dates provided to generateDateRange:', { startDate, endDate });
+    return [];
+  }
+  
+  // Ensure startDate is before endDate
+  if (startDate > endDate) {
+    console.warn('Start date is after end date in generateDateRange');
+    return [];
+  }
+  
+  try {
+    return eachDayOfInterval({ start: startDate, end: endDate });
+  } catch (error) {
+    console.error('Error generating date range:', error);
+    return [];
+  }
 }
 
 /**
  * Format contribution tooltip text
  */
-export function formatContributionTooltip(date: string, count: number): string {
-  const formattedDate = format(new Date(date), 'MMM d, yyyy');
-  if (count === 0) {
-    return `No snippets on ${formattedDate}`;
+export function formatContributionTooltip(date: string | Date, count: number): string {
+  // Validate date
+  if (!isValidDate(date)) {
+    console.warn('Invalid date provided to formatContributionTooltip:', date);
+    return 'Invalid date';
   }
-  return `${count} snippet${count !== 1 ? 's' : ''} on ${formattedDate}`;
+  
+  // Validate count
+  if (!isValidNumber(count) || count < 0) {
+    console.warn('Invalid count provided to formatContributionTooltip:', count);
+    count = 0;
+  }
+  
+  try {
+    const dateObj = date instanceof Date ? date : new Date(date);
+    const formattedDate = format(dateObj, 'MMM d, yyyy');
+    const safeCount = Math.floor(count);
+    
+    if (safeCount === 0) {
+      return `No snippets on ${formattedDate}`;
+    }
+    return `${safeCount} snippet${safeCount !== 1 ? 's' : ''} on ${formattedDate}`;
+  } catch (error) {
+    console.error('Error formatting contribution tooltip:', error);
+    return 'Error formatting date';
+  }
 }
 
 /**
@@ -99,46 +170,76 @@ export function generateContributionGrid(
   startDate: Date,
   endDate: Date
 ): ContributionWeek[] {
-  // Create a map for quick lookup
-  const dataMap = new Map(data.map(item => [item.date, item.count]));
-  
-  // Adjust start date to beginning of week (Sunday)
-  const adjustedStartDate = startOfWeek(startDate, { weekStartsOn: 0 });
-  
-  // Adjust end date to end of week (Saturday)
-  const adjustedEndDate = endOfWeek(endDate, { weekStartsOn: 0 });
-  
-  // Generate all dates
-  const allDates = generateDateRange(adjustedStartDate, adjustedEndDate);
-  
-  // Group by weeks
-  const weeks: ContributionWeek[] = [];
-  let currentWeek: ContributionWeek = { days: [] };
-  
-  allDates.forEach((date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const count = dataMap.get(dateStr) || 0;
-    const level = getContributionLevel(count);
-    
-    currentWeek.days.push({
-      date: dateStr,
-      count,
-      level
-    });
-    
-    // If we've completed a week (7 days), start a new one
-    if (currentWeek.days.length === 7) {
-      weeks.push(currentWeek);
-      currentWeek = { days: [] };
-    }
-  });
-  
-  // Add any remaining days
-  if (currentWeek.days.length > 0) {
-    weeks.push(currentWeek);
+  // Validate inputs
+  if (!Array.isArray(data)) {
+    console.warn('Invalid data provided to generateContributionGrid');
+    data = [];
   }
   
-  return weeks;
+  if (!isValidDate(startDate) || !isValidDate(endDate)) {
+    console.warn('Invalid dates provided to generateContributionGrid');
+    return [];
+  }
+  
+  if (startDate > endDate) {
+    console.warn('Start date is after end date in generateContributionGrid');
+    return [];
+  }
+  
+  // Validate and filter data
+  const validData = data.filter(item => {
+    if (!item || typeof item.date !== 'string' || !isValidNumber(item.count)) {
+      console.warn('Invalid data item in generateContributionGrid:', item);
+      return false;
+    }
+    return isValidDate(item.date) && item.count >= 0;
+  });
+  
+  // Create a map for quick lookup
+  const dataMap = new Map(validData.map(item => [item.date, Math.floor(item.count)]));
+  
+  try {
+    // Adjust start date to beginning of week (Sunday)
+    const adjustedStartDate = startOfWeek(startDate, { weekStartsOn: 0 });
+    
+    // Adjust end date to end of week (Saturday)
+    const adjustedEndDate = endOfWeek(endDate, { weekStartsOn: 0 });
+  
+    // Generate all dates
+    const allDates = generateDateRange(adjustedStartDate, adjustedEndDate);
+    
+    // Group by weeks
+    const weeks: ContributionWeek[] = [];
+    let currentWeek: ContributionWeek = { days: [] };
+    
+    allDates.forEach((date) => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const count = dataMap.get(dateStr) || 0;
+      const level = getContributionLevel(count);
+      
+      currentWeek.days.push({
+        date: dateStr,
+        count,
+        level
+      });
+      
+      // If we've completed a week (7 days), start a new one
+      if (currentWeek.days.length === 7) {
+        weeks.push(currentWeek);
+        currentWeek = { days: [] };
+      }
+    });
+    
+    // Add any remaining days
+    if (currentWeek.days.length > 0) {
+      weeks.push(currentWeek);
+    }
+    
+    return weeks;
+  } catch (error) {
+    console.error('Error generating contribution grid:', error);
+    return [];
+  }
 }
 
 /**
@@ -164,7 +265,23 @@ export interface ContributionStats {
 export function calculateContributionStats(
   data: Array<{ date: string; count: number }>
 ): ContributionStats {
-  if (data.length === 0) {
+  // Validate data
+  if (!Array.isArray(data)) {
+    console.warn('Non-array data provided to calculateContributionStats');
+    return {
+      totalContributions: 0,
+      longestStreak: 0,
+      currentStreak: 0,
+      bestDay: null
+    };
+  }
+
+  const validData = data.filter(item => 
+    item && typeof item === 'object' &&
+    isValidDate(item.date) && isValidNumber(item.count)
+  );
+
+  if (validData.length === 0) {
     return {
       totalContributions: 0,
       longestStreak: 0,
@@ -174,7 +291,7 @@ export function calculateContributionStats(
   }
   
   // Sort data by date
-  const sortedData = [...data].sort((a, b) => a.date.localeCompare(b.date));
+  const sortedData = [...validData].sort((a, b) => a.date.localeCompare(b.date));
   
   let totalContributions = 0;
   let longestStreak = 0;

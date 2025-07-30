@@ -33,8 +33,9 @@ export function TagInput({
   const [isOpen, setIsOpen] = useState(false);
   const [inputError, setInputError] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   
-  const { tagSuggestions, isLoading } = useTagSearch({
+  const { tagSuggestions, isLoading, searchTags } = useTagSearch({
     popularTagsLimit: 10
   });
 
@@ -50,10 +51,21 @@ export function TagInput({
       )
     : availableSuggestions.slice(0, 5);
 
+  // Close popover when input is cleared
+  useEffect(() => {
+    if (!inputValue.trim() && isOpen && filteredSuggestions.length === 0) {
+      setIsOpen(false);
+    }
+  }, [inputValue, isOpen, filteredSuggestions.length]);
+
   const addTag = (tag: string) => {
+    // Trim and normalize the tag (don't remove valid characters)
     const trimmedTag = tag.trim().toLowerCase();
     
-    if (!trimmedTag) return;
+    if (!trimmedTag) {
+      setInputError("Tag cannot be empty");
+      return;
+    }
     
     // Validate tag
     const validation = validateTag(trimmedTag);
@@ -62,8 +74,8 @@ export function TagInput({
       return;
     }
     
-    // Check if tag already exists
-    if (value.includes(trimmedTag)) {
+    // Check if tag already exists (case-insensitive)
+    if (value.some(t => t.toLowerCase() === trimmedTag)) {
       setInputError("Tag already added");
       return;
     }
@@ -111,6 +123,9 @@ export function TagInput({
     if (newValue.trim() && !isOpen) {
       setIsOpen(true);
     }
+    
+    // Trigger search functionality
+    searchTags(newValue);
   };
 
   const handleSuggestionSelect = (suggestion: string) => {
@@ -141,6 +156,7 @@ export function TagInput({
                 className="h-auto p-0 ml-1 hover:bg-transparent"
                 onClick={() => removeTag(tag)}
                 disabled={disabled}
+                aria-label={`Remove ${tag} tag`}
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -151,6 +167,7 @@ export function TagInput({
 
       {/* Input with suggestions */}
       <Popover open={isOpen && !disabled} onOpenChange={setIsOpen}>
+        <div ref={popoverRef}>
         <PopoverTrigger asChild>
           <div className="relative">
             <Input
@@ -160,12 +177,27 @@ export function TagInput({
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              onFocus={() => setIsOpen(true)}
+              onFocus={() => {
+                if (inputValue.trim() || availableSuggestions.length > 0) {
+                  setIsOpen(true);
+                }
+              }}
+              onBlur={(e) => {
+                // Close popover when focus leaves the input and popover
+                setTimeout(() => {
+                  if (!popoverRef.current?.contains(document.activeElement)) {
+                    setIsOpen(false);
+                  }
+                }, 200);
+              }}
               disabled={disabled}
               className={cn(
                 "pr-10",
                 hasError && "border-destructive focus-visible:ring-destructive"
               )}
+              aria-label="Tag input"
+              aria-invalid={hasError}
+              aria-describedby={hasError ? "tag-error" : undefined}
             />
             {inputValue.trim() && (
               <Button
@@ -174,7 +206,8 @@ export function TagInput({
                 size="sm"
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
                 onClick={() => addTag(inputValue)}
-                disabled={disabled}
+                disabled={disabled || !!inputError || value.length >= API_LIMITS.MAX_TAGS_PER_SNIPPET}
+                aria-label="Add tag"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -194,11 +227,12 @@ export function TagInput({
                 <div className="p-2 text-sm text-muted-foreground">Loading...</div>
               ) : filteredSuggestions.length > 0 ? (
                 <CommandGroup>
-                  {filteredSuggestions.map((suggestion) => (
+                  {filteredSuggestions.map((suggestion, index) => (
                     <CommandItem
                       key={suggestion.tag}
                       onSelect={() => handleSuggestionSelect(suggestion.tag)}
                       className="cursor-pointer"
+                      aria-label={`${suggestion.tag} (${suggestion.count} uses)`}
                     >
                       <div className="flex items-center justify-between w-full">
                         <span>{suggestion.tag}</span>
@@ -233,11 +267,14 @@ export function TagInput({
             </CommandList>
           </Command>
         </PopoverContent>
+        </div>
       </Popover>
 
       {/* Error message */}
       {hasError && (
-        <p className="text-sm text-destructive">{errorMessage}</p>
+        <p id="tag-error" className="text-sm text-destructive" role="alert">
+          {errorMessage}
+        </p>
       )}
 
       {/* Helper text */}

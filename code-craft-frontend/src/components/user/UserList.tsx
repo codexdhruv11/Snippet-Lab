@@ -15,6 +15,9 @@ interface UserListProps {
   emptyMessage?: string;
   showFollowButton?: boolean;
   className?: string;
+  error?: Error | null;
+  onRetry?: () => void;
+  retryLoading?: boolean;
 }
 
 export function UserList({
@@ -26,6 +29,9 @@ export function UserList({
   emptyMessage = 'No users found',
   showFollowButton = true,
   className,
+  error,
+  onRetry,
+  retryLoading = false,
 }: UserListProps) {
   // Loading skeleton
   const UserCardSkeleton = () => (
@@ -51,6 +57,25 @@ export function UserList({
         {[...Array(3)].map((_, i) => (
           <UserCardSkeleton key={i} />
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={`flex flex-col items-center justify-center py-12 ${className}`}>
+        <UserX className="h-12 w-12 text-destructive mb-4" />
+        <p className="text-center text-destructive mb-4">{error.message}</p>
+        <Button onClick={onRetry} disabled={retryLoading} variant="outline" size="sm">
+          {retryLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Retrying...
+            </>
+          ) : (
+            'Retry'
+          )}
+        </Button>
       </div>
     );
   }

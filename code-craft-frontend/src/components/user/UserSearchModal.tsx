@@ -42,10 +42,13 @@ export function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
   }, [searchQuery, debouncedSearch]);
 
   // Search users
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['user-search', debouncedQuery],
     queryFn: () => userSearchApi.searchUsers(debouncedQuery),
     enabled: isOpen && debouncedQuery.length > 0,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 60000, // 1 minute
   });
 
   // Reset search when modal closes
@@ -74,7 +77,7 @@ export function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const users = data?.data || [];
+    const users = data?.users || [];
     
     switch (e.key) {
       case 'ArrowDown':
@@ -157,16 +160,26 @@ export function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
             </div>
           ) : error ? (
             <div className="py-8 text-center text-destructive">
-              <p>Error searching users. Please try again.</p>
+              <p>{error.message || 'Error searching users. Please try again.'}</p>
+              <Button onClick={() => refetch()} variant="outline" size="sm" className="mt-4">
+                {isFetching ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Retrying...
+                  </>
+                ) : (
+                  'Retry'
+                )}
+              </Button>
             </div>
-          ) : data?.data?.length === 0 ? (
+          ) : data?.users?.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               <UserX className="h-8 w-8 mx-auto mb-2" />
               <p>No users found matching "{searchQuery}"</p>
             </div>
           ) : (
             <div className="space-y-2" id="search-results" role="listbox">
-              {data?.data?.map((user: any, index: number) => (
+              {data?.users?.map((user: any, index: number) => (
                 <div
                   key={user._id}
                   onClick={() => handleUserClick(user._id)}
@@ -186,7 +199,7 @@ export function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
         </ScrollArea>
 
         {/* View All Results */}
-        {data?.data?.length > 0 && (
+        {data?.users?.length > 0 && (
           <div className="flex justify-center pt-2">
             <Button
               onClick={handleViewAllResults}

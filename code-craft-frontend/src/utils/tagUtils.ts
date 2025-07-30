@@ -18,11 +18,16 @@ export const validateTag = (tag: string): { isValid: boolean; error?: string } =
     return { isValid: false, error: `Tag must be no more than ${API_LIMITS.MAX_TAG_LENGTH} characters` };
   }
   
-  // Check for valid characters (alphanumeric, hyphens, underscores)
-  if (!/^[a-zA-Z0-9_-]+$/.test(trimmedTag)) {
-    return { isValid: false, error: 'Tag can only contain letters, numbers, hyphens, and underscores' };
+  // Improved regex validation for alphanumeric, hyphens, underscores, periods, and dashes
+  if (!/^[a-zA-Z0-9._-]+$/.test(trimmedTag)) {
+    return { isValid: false, error: 'Tag can only contain letters, numbers, hyphens, underscores, periods, and dashes' };
   }
   
+  const reservedKeywords = ['admin', 'null', 'undefined'];
+  if (reservedKeywords.includes(trimmedTag.toLowerCase())) {
+    return { isValid: false, error: 'Tag is a reserved keyword' };
+  }
+
   return { isValid: true };
 };
 
@@ -86,8 +91,10 @@ export const filterTagsByQuery = (tags: string[], query: string): string[] => {
   if (!query.trim()) return tags;
   
   const lowercaseQuery = query.toLowerCase();
-  return tags.filter(tag => 
-    tag.toLowerCase().includes(lowercaseQuery)
+  return tags.filter(tag =>
+    tag.toLowerCase().includes(lowercaseQuery) ||
+    tag.toLowerCase().startsWith(lowercaseQuery) ||
+    tag.toLowerCase().endsWith(lowercaseQuery)
   );
 };
 
@@ -107,7 +114,12 @@ export const validateTags = (tags: string[]): { isValid: boolean; errors: string
       errors.push(`Tag ${index + 1}: ${validation.error}`);
     }
   });
-  
+
+  // Detailed error information and suggestions
+  if (errors.length) {
+    errors.push('Consider shortening or altering your tags to meet the validation rules.');
+  }
+
   return {
     isValid: errors.length === 0,
     errors

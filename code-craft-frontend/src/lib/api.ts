@@ -3,6 +3,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { toast } from 'sonner';
 import { API_BASE_URL, API_ENDPOINTS, ERROR_CODES } from './constants';
+import { validateUserId, validatePagination } from './validation';
 import { 
   Snippet, 
   PaginatedResponse, 
@@ -192,12 +193,70 @@ export const userApi = {
   },
   
   getContributionGraph: async (userId: string, startDate?: string, endDate?: string): Promise<ContributionGraphResponse> => {
-    const params: any = {};
-    if (startDate) params.startDate = startDate;
-    if (endDate) params.endDate = endDate;
-    
-    const response = await apiClient.get(API_ENDPOINTS.USERS.CONTRIBUTION_GRAPH(userId), { params });
-    return response.data;
+    try {
+      // Validate userId
+      const validation = validateUserId(userId);
+      if (!validation.isValid) {
+        throw new Error(validation.error || 'Invalid user ID');
+      }
+
+      // Validate dates if provided
+      const params: any = {};
+      if (startDate) {
+        const startDateObj = new Date(startDate);
+        if (isNaN(startDateObj.getTime())) {
+          throw new Error('Invalid start date format');
+        }
+        params.startDate = startDate;
+      }
+      if (endDate) {
+        const endDateObj = new Date(endDate);
+        if (isNaN(endDateObj.getTime())) {
+          throw new Error('Invalid end date format');
+        }
+        params.endDate = endDate;
+      }
+
+      // Make the API request with timeout
+      const response = await apiClient.get(API_ENDPOINTS.USERS.CONTRIBUTION_GRAPH(userId), { 
+        params,
+        timeout: 15000 // 15 seconds for aggregation queries
+      });
+
+      // Validate response structure
+      if (!response.data) {
+        throw new Error('Invalid response: No data returned');
+      }
+
+      // Handle both {data: [...]} and direct array responses
+      const responseData = response.data;
+      if (responseData.data && Array.isArray(responseData.data)) {
+        return responseData;
+      } else if (Array.isArray(responseData)) {
+        // If backend returns array directly, wrap it
+        return { data: responseData, meta: {} };
+      } else {
+        console.error('Unexpected contribution graph response format:', responseData);
+        // Return empty data to prevent crashes
+        return { data: [], meta: {} };
+      }
+    } catch (error: any) {
+      console.error('Error fetching contribution graph:', error);
+      
+      // Add more context to the error
+      if (error.response?.status === 400) {
+        const errorMessage = error.response?.data?.error?.message || 'Invalid request parameters';
+        throw new Error(`Validation error: ${errorMessage}`);
+      }
+      if (error.response?.status === 404) {
+        throw new Error('User not found');
+      }
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Request timeout: The server took too long to respond');
+      }
+      
+      throw error;
+    }
   },
 };
 
@@ -241,10 +300,75 @@ export const snippetApi = {
     return response.data;
   },
 
-  getPopularTags: async (limit?: number) => {
-    const params = limit ? { limit } : {};
-    const response = await apiClient.get(API_ENDPOINTS.TAGS.POPULAR, { params });
-    return response.data;
+  getPopularTags: async (limit?: number): Promise<PopularTagsResponse> => {
+    try {
+      // Validate limit parameter
+      const validLimit = limit && limit > 0 && limit <= 100 ? limit : 20;
+      const params = { limit: validLimit };
+      
+      const response = await apiClient.get(API_ENDPOINTS.TAGS.POPULAR, { 
+        params,
+        timeout: 10000 // 10 seconds for tag aggregation
+      });
+      
+      // Validate response structure
+      if (!response.data) {
+        console.error('Invalid popular tags response: No data');
+        return { data: [], total: 0 };
+      }
+      
+      const responseData = response.data;
+      
+      // Handle both {data: TagData[], total: number} and {tags: TagData[]} formats
+      if (responseData.data && Array.isArray(responseData.data)) {
+        // Validate each tag object
+        const validatedData = responseData.data.filter((tag: any) => 
+          tag && typeof tag.tag === 'string' && typeof tag.count === 'number'
+        );
+        return { 
+          data: validatedData, 
+          total: responseData.total || validatedData.length 
+        };
+      } else if (responseData.tags && Array.isArray(responseData.tags)) {
+        // Handle legacy format
+        const validatedTags = responseData.tags.filter((tag: any) => 
+          tag && typeof tag.tag === 'string' && typeof tag.count === 'number'
+        );
+        return { 
+          data: validatedTags, 
+          total: validatedTags.length 
+        };
+      } else if (Array.isArray(responseData)) {
+        // Handle direct array response
+        const validatedArray = responseData.filter((tag: any) => 
+          tag && typeof tag.tag === 'string' && typeof tag.count === 'number'
+        );
+        return { 
+          data: validatedArray, 
+          total: validatedArray.length 
+        };
+      } else {
+        console.error('Unexpected popular tags response format:', responseData);
+        return { data: [], total: 0 };
+      }
+    } catch (error: any) {
+      console.error('Error fetching popular tags:', error);
+      
+      // Handle specific error cases
+      if (error.response?.status === 400) {
+        const errorMessage = error.response?.data?.error?.message || 'Invalid request parameters';
+        throw new Error(`Validation error: ${errorMessage}`);
+      }
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Request timeout: Failed to fetch popular tags');
+      }
+      if (error.message === 'Network Error') {
+        throw new Error('Network error: Please check your connection');
+      }
+      
+      // Return empty data for other errors
+      return { data: [], total: 0 };
+    }
   },
 };
 
@@ -361,37 +485,101 @@ export const executionApi = {
  */
 export const followApi = {
   toggleFollow: async (userId: string) => {
-    const response = await apiClient.post(API_ENDPOINTS.FOLLOWS.TOGGLE(userId));
-    return response.data;
+    try {
+      const validation = validateUserId(userId);
+      if (!validation.isValid) {
+        throw new Error(validation.error || 'Invalid user ID');
+      }
+
+      const response = await apiClient.post(API_ENDPOINTS.FOLLOWS.TOGGLE(userId));
+      return response.data;
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+      throw error;
+    }
   },
-  
+
   getFollowers: async (userId: string, page: number = 1, limit: number = 20) => {
-    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWERS(userId), {
-      params: { page, limit },
-    });
-    return response.data;
+    try {
+      const validation = validateUserId(userId);
+      if (!validation.isValid) {
+        throw new Error(validation.error || 'Invalid user ID');
+      }
+
+      const { page: validPage, limit: validLimit } = validatePagination(page, limit);
+
+      const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWERS(userId), {
+        params: { page: validPage, limit: validLimit },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting followers:', error);
+      throw error;
+    }
   },
-  
+
   getFollowing: async (userId: string, page: number = 1, limit: number = 20) => {
-    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWING(userId), {
-      params: { page, limit },
-    });
-    return response.data;
+    try {
+      const validation = validateUserId(userId);
+      if (!validation.isValid) {
+        throw new Error(validation.error || 'Invalid user ID');
+      }
+
+      const { page: validPage, limit: validLimit } = validatePagination(page, limit);
+
+      const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWING(userId), {
+        params: { page: validPage, limit: validLimit },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting following:', error);
+      throw error;
+    }
   },
-  
+
   getFollowerCount: async (userId: string) => {
-    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWER_COUNT(userId));
-    return response.data;
+    try {
+      const validation = validateUserId(userId);
+      if (!validation.isValid) {
+        throw new Error(validation.error || 'Invalid user ID');
+      }
+
+      const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWER_COUNT(userId));
+      return response.data;
+    } catch (error) {
+      console.error('Error getting follower count:', error);
+      throw error;
+    }
   },
-  
+
   getFollowingCount: async (userId: string) => {
-    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWING_COUNT(userId));
-    return response.data;
+    try {
+      const validation = validateUserId(userId);
+      if (!validation.isValid) {
+        throw new Error(validation.error || 'Invalid user ID');
+      }
+
+      const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.FOLLOWING_COUNT(userId));
+      return response.data;
+    } catch (error) {
+      console.error('Error getting following count:', error);
+      throw error;
+    }
   },
-  
+
   checkFollowStatus: async (userId: string) => {
-    const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.CHECK(userId));
-    return response.data;
+    try {
+      const validation = validateUserId(userId);
+      if (!validation.isValid) {
+        throw new Error(validation.error || 'Invalid user ID');
+      }
+
+      const response = await apiClient.get(API_ENDPOINTS.FOLLOWS.CHECK(userId));
+      return response.data;
+    } catch (error) {
+      console.error('Error checking follow status:', error);
+      throw error;
+    }
   },
 };
 
@@ -400,10 +588,103 @@ export const followApi = {
  */
 export const userSearchApi = {
   searchUsers: async (query: string, page: number = 1, limit: number = 20) => {
-    const response = await apiClient.get(API_ENDPOINTS.USER_SEARCH.SEARCH, {
-      params: { q: query, page, limit },
-    });
-    return response.data;
+    try {
+      // Validate query
+      if (!query || query.trim().length === 0) {
+        return { users: [], total: 0, page, limit };
+      }
+      
+      if (query.length > 100) {
+        throw new Error('Query is too long');
+      }
+
+      const response = await apiClient.get(API_ENDPOINTS.USER_SEARCH.SEARCH, {
+        params: { q: query.trim(), page, limit },
+        timeout: 10000, // 10 seconds
+      });
+
+      // Validate response structure
+      if (!response.data) {
+        throw new Error('No response data received');
+      }
+      
+      if (!response.data.users || !Array.isArray(response.data.users)) {
+        console.warn('Unexpected response format, returning empty result');
+        return { users: [], total: 0, page, limit };
+      }
+
+      return response.data;
+    } catch (error: any) {
+      // Handle specific errors
+      if (error.response) {
+        const status = error.response.status;
+        const message = error.response.data?.message || error.message;
+        
+        if (status === 400) {
+          throw new Error(`Validation error: ${message}`);
+        } else if (status === 429) {
+          const retryAfter = error.response.headers['retry-after'];
+          throw new Error(`Rate limit exceeded. Please try again in ${retryAfter || 'a few'} seconds.`);
+        } else if (status === 500) {
+          throw new Error('Server error. Please try again later.');
+        }
+      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Request timed out. Please check your connection and try again.');
+      } else if (error.code === 'ERR_NETWORK') {
+        throw new Error('Network error. Please check your internet connection.');
+      }
+
+      console.error('searchUsers error:', error);
+      throw new Error(error.message || 'Failed to search users');
+    }
+  },
+  
+  getPopularUsers: async (page: number = 1, limit: number = 20) => {
+    try {
+      const { page: validPage, limit: validLimit } = validatePagination(page, limit);
+      
+      const response = await apiClient.get(API_ENDPOINTS.USER_SEARCH.POPULAR, {
+        params: { page: validPage, limit: validLimit },
+        timeout: 10000,
+      });
+      
+      if (!response.data || !Array.isArray(response.data.users)) {
+        console.warn('Unexpected response format for popular users');
+        return { users: [], total: 0, page: validPage, limit: validLimit };
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('getPopularUsers error:', error);
+      if (error.response?.status === 429) {
+        throw new Error('Too many requests. Please try again later.');
+      }
+      throw new Error(error.message || 'Failed to fetch popular users');
+    }
+  },
+  
+  getRecentUsers: async (page: number = 1, limit: number = 20) => {
+    try {
+      const { page: validPage, limit: validLimit } = validatePagination(page, limit);
+      
+      const response = await apiClient.get(API_ENDPOINTS.USER_SEARCH.RECENT, {
+        params: { page: validPage, limit: validLimit },
+        timeout: 10000,
+      });
+      
+      if (!response.data || !Array.isArray(response.data.users)) {
+        console.warn('Unexpected response format for recent users');
+        return { users: [], total: 0, page: validPage, limit: validLimit };
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('getRecentUsers error:', error);
+      if (error.response?.status === 429) {
+        throw new Error('Too many requests. Please try again later.');
+      }
+      throw new Error(error.message || 'Failed to fetch recent users');
+    }
   },
 };
 
