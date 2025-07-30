@@ -119,3 +119,7 @@ temp/
 # Local dev
 .local
 .history
+
+# MongoDB Memory Server binaries
+.mongo-binaries/
+.cache/mongodb-binaries/
