@@ -27,7 +27,7 @@ router.post(
 
 // Get follower count - public endpoint
 router.get(
-  '/users/:id/followers/count',
+  '/:id/followers/count',
   validateObjectId('id'),
   generalLimiter,
   getFollowerCount
@@ -35,7 +35,7 @@ router.get(
 
 // Get following count - public endpoint
 router.get(
-  '/users/:id/following/count',
+  '/:id/following/count',
   validateObjectId('id'),
   generalLimiter,
   getFollowingCount
