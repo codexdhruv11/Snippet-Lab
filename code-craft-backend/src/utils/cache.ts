@@ -21,20 +21,22 @@ class CacheService {
   private redisClient: RedisClientType | null = null;
   private inMemoryCache: InMemoryCache = {};
   private isConnected: boolean = false;
+  private redisUrl: string | undefined;
 
-  constructor() {
+  constructor(redisUrl?: string) {
+    this.redisUrl = redisUrl || config.redisUrl;
     this.initializeRedis();
   }
 
   private async initializeRedis(): Promise<void> {
-    if (!config.redisUrl) {
+    if (!this.redisUrl) {
       logger.info('Redis URL not configured, using in-memory cache');
       return;
     }
 
     try {
       this.redisClient = createClient({
-        url: config.redisUrl,
+        url: this.redisUrl,
         socket: {
           reconnectStrategy: (retries) => {
             if (retries > 10) {
@@ -92,17 +94,21 @@ class CacheService {
   /**
    * Set value in cache with TTL
    */
-  async set(key: string, value: any, ttl: number): Promise<void> {
+  async set(key: string, value: any, ttl?: number): Promise<void> {
     try {
       const serialized = JSON.stringify(value);
       
       if (this.redisClient && this.isConnected) {
-        await this.redisClient.setEx(key, ttl, serialized);
+        if (ttl) {
+          await this.redisClient.setEx(key, ttl, serialized);
+        } else {
+          await this.redisClient.set(key, serialized);
+        }
       } else {
         // Fallback to in-memory cache
         this.inMemoryCache[key] = {
           value,
-          expiresAt: Date.now() + (ttl * 1000),
+          expiresAt: ttl ? Date.now() + (ttl * 1000) : Infinity,
         };
         
         // Clean up old entries periodically
@@ -183,10 +189,17 @@ class CacheService {
       await this.redisClient.quit();
     }
   }
+
+  get isReady(): boolean {
+    return this.redisClient?.isReady ?? false;
+  }
 }
 
 // Export singleton instance
 export const cache = new CacheService();
+
+// Export the class for testing
+export { CacheService };
 
 // Export cache TTL constants
 export { CACHE_TTL };
