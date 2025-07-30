@@ -24,6 +24,7 @@ import { ContributionGraphSkeleton } from './ContributionGraphSkeleton';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ErrorBoundary } from 'react-error-boundary';
+import { isValidObjectId } from '@/lib/validation';
 
 interface ContributionThresholds {
   low: number;
@@ -64,6 +65,10 @@ function ContributionGraphContent({
   thresholds = defaultThresholds,
   colors = defaultColors
 }: ContributionGraphProps) {
+  // Validate userId before any hooks to ensure consistent hook order
+  const isValidUserId = isValidObjectId(userId);
+  
+  // All hooks must be called unconditionally
   const { startDate, endDate } = getDefaultDateRange();
   const gridRef = useRef<HTMLDivElement>(null);
   const [focusedSquare, setFocusedSquare] = React.useState<{ week: number; day: number } | null>(null);
@@ -94,21 +99,46 @@ function ContributionGraphContent({
     queryKey: ['contribution-graph', userId],
     queryFn: () => userApi.getContributionGraph(userId),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: isValidUserId, // Only fetch if userId is valid
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  // Handle invalid userId
+  if (!isValidUserId) {
+    return (
+      <div className={cn('p-6 text-center', className)}>
+        <p className="text-destructive font-medium mb-2">Invalid User ID</p>
+        <p className="text-sm text-muted-foreground">
+          The user ID provided is not in a valid format.
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return <ContributionGraphSkeleton className={className} />;
   }
 
-  if (error || !data) {
+  if (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to load contribution graph';
+    const isNetworkError = errorMessage.includes('network') || errorMessage.includes('Network');
+    // Safely check for response status
+    const errorResponse = (error as any)?.response;
+    const is404Error = errorResponse?.status === 404;
+    const is400Error = errorResponse?.status === 400;
+    
     return (
       <div className={cn('p-6 text-center', className)}>
-        <p className="text-muted-foreground mb-4">
-          Failed to load contribution graph
+        <p className="text-destructive font-medium mb-2">
+          {is404Error ? 'User not found' : is400Error ? 'Invalid request' : 'Failed to load contribution graph'}
+        </p>
+        <p className="text-sm text-muted-foreground mb-4">
+          {isNetworkError ? 'Please check your internet connection' : errorMessage}
         </p>
         <button
           onClick={() => refetch()}
-          className="text-primary hover:underline text-sm"
+          className="text-primary hover:underline text-sm font-medium"
         >
           Try again
         </button>
@@ -116,9 +146,39 @@ function ContributionGraphContent({
     );
   }
 
+  // Validate data structure
+  if (!data || typeof data !== 'object') {
+    return (
+      <div className={cn('p-6 text-center', className)}>
+        <p className="text-destructive font-medium mb-2">Invalid data format</p>
+        <p className="text-sm text-muted-foreground mb-4">
+          The server returned an unexpected response format.
+        </p>
+        <button
+          onClick={() => refetch()}
+          className="text-primary hover:underline text-sm font-medium"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  // Safely extract contribution data with validation
+  const contributionData = Array.isArray(data?.data) ? data.data : 
+                          Array.isArray(data) ? data : [];
+  
+  // Validate contribution data items
+  const validContributionData = contributionData.filter(item => {
+    if (!item || typeof item !== 'object') return false;
+    if (typeof item.date !== 'string' || !item.date) return false;
+    if (typeof item.count !== 'number' || item.count < 0) return false;
+    return true;
+  });
+  
   // Generate grid data with custom contribution levels
   const rawGrid = generateContributionGrid(
-    data.data || [],
+    validContributionData,
     startDate,
     endDate
   );
@@ -133,7 +193,7 @@ function ContributionGraphContent({
   }));
 
   // Calculate stats
-  const stats = calculateContributionStats(data.data || []);
+  const stats = calculateContributionStats(contributionData);
 
   // Get month labels
   const monthLabels = getMonthLabels(startDate, endDate);
@@ -288,7 +348,9 @@ function ContributionGraphContent({
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             transition={{
-                              delay: (weekIndex * 7 + dayIndex) * 0.001,
+                              // Optimize animation delay for large datasets
+                              // Use progressive delay that's faster for later items
+                              delay: weekIndex < 10 ? (weekIndex * 7 + dayIndex) * 0.002 : 0.1 + (weekIndex * 0.001),
                               type: 'spring',
                               stiffness: 300,
                               damping: 20,
@@ -396,7 +458,17 @@ export function ContributionGraph(props: ContributionGraphProps) {
   return (
     <ErrorBoundary
       FallbackComponent={ContributionGraphError}
-      onReset={() => window.location.reload()}
+      onReset={() => {
+        // Simple cache invalidation - component will refetch on reset
+        if (typeof window !== 'undefined') {
+          // Force a re-render by updating the key
+          window.location.reload();
+        }
+      }}
+      onError={(error, errorInfo) => {
+        console.error('ContributionGraph Error:', error);
+        console.error('Error Info:', errorInfo);
+      }}
     >
       <ContributionGraphContent {...props} />
     </ErrorBoundary>
