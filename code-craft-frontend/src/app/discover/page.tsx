@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, TrendingUp, Clock, Users } from "lucide-react";
+import { useSearchParams, useRouter } from 'next/navigation';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,8 +15,13 @@ import { UserProfile } from "@/types/api";
 import { useDebounce } from "@/hooks/useDebounce";
 
 export default function DiscoverPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialSearchQuery = searchParams.get('q') || '';
+
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [searchPage, setSearchPage] = useState(1);
+  const [accumulatedUsers, setAccumulatedUsers] = useState<any[]>([]);
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   // Search users query
@@ -28,32 +34,62 @@ export default function DiscoverPage() {
     enabled: !!debouncedSearchQuery,
     staleTime: 1 * 60 * 1000, // 1 minute
   });
+  
+  // Accumulate users when new page loads
+  useEffect(() => {
+    if (searchUsersQuery.data?.data) {
+      if (searchPage === 1) {
+        setAccumulatedUsers(searchUsersQuery.data.data);
+      } else {
+        setAccumulatedUsers(prev => [...prev, ...searchUsersQuery.data.data]);
+      }
+    }
+  }, [searchUsersQuery.data, searchPage]);
+  
+  // Reset accumulated users when search query changes
+  useEffect(() => {
+    setAccumulatedUsers([]);
+    setSearchPage(1);
+  }, [debouncedSearchQuery]);
 
   // Popular users query (most followers)
   const popularUsersQuery = useQuery({
     queryKey: ["popularUsers"],
     queryFn: async () => {
-      // TODO: Implement dedicated endpoint for popular users
-      // This should return users sorted by follower count
-      // Example: GET /api/users/popular?limit=10
-      // For now, we'll use search with empty query to get all users
-      return await userSearchApi.searchUsers("", 1, 10);
+      return await userSearchApi.getPopularUsers(1, 10);
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
+    onError: (error: any) => {
+      console.error('Error fetching popular users:', error);
+    },
   });
 
   // Recent users query
   const recentUsersQuery = useQuery({
     queryKey: ["recentUsers"],
     queryFn: async () => {
-      // TODO: Implement dedicated endpoint for recent users
-      // This should return users sorted by registration date (newest first)
-      // Example: GET /api/users/recent?limit=10
-      // For now, we'll use search with empty query
-      return await userSearchApi.searchUsers("", 1, 10);
+      return await userSearchApi.getRecentUsers(1, 10);
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
+    onError: (error: any) => {
+      console.error('Error fetching recent users:', error);
+    },
   });
+
+  useEffect(() => {
+    // Only update URL if the query differs from the initial one
+    if (searchQuery !== initialSearchQuery) {
+      const delayDebounceFn = setTimeout(() => {
+        if (searchQuery) {
+          router.replace(`/discover?q=${encodeURIComponent(searchQuery)}`);
+        } else {
+          router.replace('/discover');
+        }
+      }, 300);
+
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [searchQuery, initialSearchQuery, router]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -89,16 +125,26 @@ export default function DiscoverPage() {
               className="flex-1"
             />
           </div>
-          
-          {searchUsersQuery.data && (
+          {searchUsersQuery.error ? (
             <div className="mt-6">
-              <UserList
-                users={searchUsersQuery.data.data}
-                isLoading={searchUsersQuery.isLoading}
-                hasMore={searchUsersQuery.data.pagination?.hasMore || false}
-                onLoadMore={handleLoadMore}
-              />
+              <p className="text-destructive">{searchUsersQuery.error.message}</p>
+              <Button onClick={() => searchUsersQuery.refetch()} isLoading={searchUsersQuery.isFetching}>Retry</Button>
             </div>
+          ) : (
+            searchUsersQuery.data && (
+              <div className="mt-6">
+                <UserList
+                  users={accumulatedUsers}
+                  isLoading={searchUsersQuery.isLoading && searchPage === 1}
+                  isLoadingMore={searchUsersQuery.isFetching && searchPage > 1}
+                  error={searchUsersQuery.error}
+                  onRetry={() => searchUsersQuery.refetch()}
+                  retryLoading={searchUsersQuery.isFetching}
+                  hasMore={searchUsersQuery.data?.pagination?.hasNext || false}
+                  onLoadMore={handleLoadMore}
+                />
+              </div>
+            )
           )}
         </CardContent>
       </Card>
@@ -119,6 +165,9 @@ export default function DiscoverPage() {
               <UserList
                 users={popularUsersQuery.data?.data || []}
                 isLoading={popularUsersQuery.isLoading}
+                error={popularUsersQuery.error}
+                onRetry={() => popularUsersQuery.refetch()}
+                retryLoading={popularUsersQuery.isFetching}
                 hasMore={false}
                 onLoadMore={() => {}}
               />
@@ -138,6 +187,9 @@ export default function DiscoverPage() {
               <UserList
                 users={recentUsersQuery.data?.data || []}
                 isLoading={recentUsersQuery.isLoading}
+                error={recentUsersQuery.error}
+                onRetry={() => recentUsersQuery.refetch()}
+                retryLoading={recentUsersQuery.isFetching}
                 hasMore={false}
                 onLoadMore={() => {}}
               />
