@@ -608,9 +608,10 @@ export const userSearchApi = {
         throw new Error('No response data received');
       }
       
-      if (!response.data.users || !Array.isArray(response.data.users)) {
+      // Backend returns data with 'data' field for paginated responses
+      if (!response.data.data || !Array.isArray(response.data.data)) {
         console.warn('Unexpected response format, returning empty result');
-        return { users: [], total: 0, page, limit };
+        return { data: [], pagination: { page, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
       }
 
       return response.data;
@@ -648,9 +649,9 @@ export const userSearchApi = {
         timeout: 10000,
       });
       
-      if (!response.data || !Array.isArray(response.data.users)) {
+      if (!response.data || !response.data.data || !Array.isArray(response.data.data)) {
         console.warn('Unexpected response format for popular users');
-        return { users: [], total: 0, page: validPage, limit: validLimit };
+        return { data: [], pagination: { page: validPage, limit: validLimit, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
       }
       
       return response.data;
@@ -672,9 +673,9 @@ export const userSearchApi = {
         timeout: 10000,
       });
       
-      if (!response.data || !Array.isArray(response.data.users)) {
+      if (!response.data || !response.data.data || !Array.isArray(response.data.data)) {
         console.warn('Unexpected response format for recent users');
-        return { users: [], total: 0, page: validPage, limit: validLimit };
+        return { data: [], pagination: { page: validPage, limit: validLimit, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
       }
       
       return response.data;
