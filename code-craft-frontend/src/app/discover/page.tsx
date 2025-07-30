@@ -28,10 +28,10 @@ export default function DiscoverPage() {
   const searchUsersQuery = useQuery({
     queryKey: ["searchUsers", debouncedSearchQuery, searchPage],
     queryFn: async () => {
-      if (!debouncedSearchQuery) return null;
+      if (!debouncedSearchQuery || debouncedSearchQuery.length < 2) return null;
       return await userSearchApi.searchUsers(debouncedSearchQuery, searchPage, API_LIMITS.MAX_USERS_PER_PAGE);
     },
-    enabled: !!debouncedSearchQuery,
+    enabled: !!debouncedSearchQuery && debouncedSearchQuery.length >= 2,
     staleTime: 1 * 60 * 1000, // 1 minute
   });
   
@@ -119,6 +119,11 @@ export default function DiscoverPage() {
               className="flex-1"
             />
           </div>
+          {searchQuery && searchQuery.length < 2 && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Type at least 2 characters to search
+            </p>
+          )}
           {searchUsersQuery.error ? (
             <div className="mt-6">
               <p className="text-destructive">{searchUsersQuery.error.message}</p>
