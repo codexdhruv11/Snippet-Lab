@@ -7,6 +7,8 @@ const CACHE_TTL = {
   POPULAR_TAGS: 3600, // 1 hour
   SNIPPET_LIST: 300,  // 5 minutes
   USER_PROFILE: 600,  // 10 minutes
+  POPULAR_USERS: 600, // 10 minutes
+  RECENT_USERS: 300,  // 5 minutes
 };
 
 // In-memory cache as fallback when Redis is not available
@@ -209,4 +211,6 @@ export const cacheKeys = {
   popularTags: (limit: number) => CacheService.generateKey('popular-tags', limit),
   snippetList: (query: string) => CacheService.generateKey('snippets', query),
   userProfile: (userId: string) => CacheService.generateKey('user', userId),
+  popularUsers: (limit: number) => CacheService.generateKey('popular-users', limit),
+  recentUsers: (limit: number) => CacheService.generateKey('recent-users', limit),
 };

@@ -28,14 +28,8 @@ export const useTagSearch = (options: UseTagSearchOptions = {}) => {
       try {
         const response = await snippetApi.getPopularTags(popularTagsLimit);
         // Validate response structure
-        if (!response || (typeof response === 'object' && !Array.isArray(response))) {
-          // If response is an object, check for data or tags field
-          if (response.data && Array.isArray(response.data)) {
-            return response;
-          } else if (response.tags && Array.isArray(response.tags)) {
-            // Convert old format to new format for consistency
-            return { data: response.tags, total: response.tags.length };
-          }
+        if (response && Array.isArray(response.data)) {
+          return response;
         }
         // Return empty data structure if response is malformed
         console.error('Invalid popular tags response format:', response);
@@ -46,13 +40,11 @@ export const useTagSearch = (options: UseTagSearchOptions = {}) => {
       }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
   });
 
   // Fix API response structure mismatch - backend returns {data: TagData[], total}
-  // Handle both response formats for backward compatibility
-  const popularTags = popularTagsData?.data || popularTagsData?.tags || [];
+  const popularTags = popularTagsData?.data || [];
 
   // Filter tags based on search query
   // Ensure we have valid tag data before filtering

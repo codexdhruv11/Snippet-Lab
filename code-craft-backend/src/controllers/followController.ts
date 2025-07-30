@@ -63,7 +63,7 @@ export const toggleFollow = catchAsync(
     try {
       await validateUserExists(targetUserId);
     } catch (error) {
-      logger.error(`User validation failed - targetUserId: ${targetUserId}, error: ${error.message}`);
+      logger.error(`User validation failed - targetUserId: ${targetUserId}, error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
     }
 
@@ -88,10 +88,10 @@ export const toggleFollow = catchAsync(
         isFollowing: result.isFollowing,
         followerCount: result.followerCount,
         timestamp: new Date().toISOString(),
-        requestId: req.id || 'unknown',
+        requestId: (req as any).id || 'unknown',
       });
     } catch (error) {
-      logger.error(`Follow toggle failed - followerId: ${followerId}, targetUserId: ${targetUserId}, error: ${error.message}`);
+      logger.error(`Follow toggle failed - followerId: ${followerId}, targetUserId: ${targetUserId}, error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw transformFollowError(error);
     }
   }

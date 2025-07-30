@@ -196,7 +196,7 @@ export function TagInput({
                 hasError && "border-destructive focus-visible:ring-destructive"
               )}
               aria-label="Tag input"
-              aria-invalid={hasError}
+                aria-invalid={hasError ? "true" : "false"}
               aria-describedby={hasError ? "tag-error" : undefined}
             />
             {inputValue.trim() && (

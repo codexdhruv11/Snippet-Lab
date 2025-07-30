@@ -59,9 +59,6 @@ export default function DiscoverPage() {
       return await userSearchApi.getPopularUsers(1, 10);
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    onError: (error: any) => {
-      console.error('Error fetching popular users:', error);
-    },
   });
 
   // Recent users query
@@ -71,9 +68,6 @@ export default function DiscoverPage() {
       return await userSearchApi.getRecentUsers(1, 10);
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    onError: (error: any) => {
-      console.error('Error fetching recent users:', error);
-    },
   });
 
   useEffect(() => {

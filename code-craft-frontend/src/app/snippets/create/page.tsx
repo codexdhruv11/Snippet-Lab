@@ -78,8 +78,8 @@ export default function CreateSnippetPage() {
     },
     onError: (error: unknown) => {
       let errorMessage = "Failed to create snippet";
-      let tagErrors = [];
-      
+      const tagErrors: string[] = [];
+
       if (error && typeof error === 'object' && 'response' in error) {
         const apiError = (error as { response?: { data?: { error?: { details?: Array<{ msg: string }>, message?: string } } } })?.response?.data?.error;
         if (apiError?.details && Array.isArray(apiError.details)) {
@@ -96,7 +96,7 @@ export default function CreateSnippetPage() {
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      
+
       if (tagErrors.length > 0) {
         setTags([]); // Clear invalid tags
         toast.error(`Tag errors: ${tagErrors.join(", ")}`);

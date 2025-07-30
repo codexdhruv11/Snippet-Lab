@@ -613,8 +613,8 @@ export const getPopularUsers = catchAsync(async (req: Request, res: Response): P
 
   try {
     const cacheKey = cacheKeys.popularUsers(limit);
-    const cachedData = await cache.get(cacheKey);
-    if (cachedData && cachedData.data) {
+    const cachedData = await cache.get<any>(cacheKey);
+    if (cachedData) {
       res.status(HTTP_STATUS.OK).json(cachedData);
       return;
     }
@@ -646,11 +646,9 @@ export const getPopularUsers = catchAsync(async (req: Request, res: Response): P
       return;
     }
 
-    // Cache the results
-    await cache.set(cacheKey, users, CACHE_TTL.POPULAR_USERS);
-
     const totalUsers = await User.countDocuments();
     const response = buildPaginationResponse(users, totalUsers, page, limit);
+    // Cache the response
     await cache.set(cacheKey, response, CACHE_TTL.POPULAR_USERS);
     res.status(HTTP_STATUS.OK).json(response);
   } catch (error) {
@@ -667,8 +665,8 @@ export const getRecentUsers = catchAsync(async (req: Request, res: Response): Pr
 
   try {
     const cacheKey = cacheKeys.recentUsers(limit);
-    const cachedData = await cache.get(cacheKey);
-    if (cachedData && cachedData.data) {
+    const cachedData = await cache.get<any>(cacheKey);
+    if (cachedData) {
       res.status(HTTP_STATUS.OK).json(cachedData);
       return;
     }
@@ -686,11 +684,9 @@ export const getRecentUsers = catchAsync(async (req: Request, res: Response): Pr
       return;
     }
 
-    // Cache the results
-    await cache.set(cacheKey, users, CACHE_TTL.RECENT_USERS);
-
     const totalUsers = await User.countDocuments();
     const response = buildPaginationResponse(users, totalUsers, page, limit);
+    // Cache the response
     await cache.set(cacheKey, response, CACHE_TTL.RECENT_USERS);
     res.status(HTTP_STATUS.OK).json(response);
   } catch (error) {
