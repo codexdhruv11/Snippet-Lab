@@ -23,7 +23,7 @@ const colors = {
 winston.addColors(colors);
 
 // Helper function to filter sensitive data from logs
-const filterSensitiveData = (obj: any): any => {
+export const filterSensitiveData = (obj: any): any => {
   if (typeof obj !== 'object' || obj === null) {
     return obj;
   }
