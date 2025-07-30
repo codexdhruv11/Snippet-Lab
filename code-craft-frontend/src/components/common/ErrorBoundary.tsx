@@ -1,8 +1,10 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  onRetry?: () => void;
 }
 
 interface State {
@@ -24,6 +26,11 @@ class ErrorBoundary extends Component<Props, State> {
     console.error('Uncaught error:', error, errorInfo);
   }
 
+  public retry = () => {
+    this.setState({ hasError: false, error: null });
+    this.props.onRetry && this.props.onRetry();
+  };
+
   public render() {
     if (this.state.hasError) {
       return (
@@ -33,6 +40,9 @@ class ErrorBoundary extends Component<Props, State> {
             <p className="mt-2 text-sm text-red-600">
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
+            <Button onClick={this.retry} className="mt-4">
+              Retry
+            </Button>
           </div>
         )
       );
