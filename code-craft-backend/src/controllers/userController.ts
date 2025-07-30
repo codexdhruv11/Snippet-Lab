@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { User, CodeExecution, Star, Snippet } from '../models';
+import { User, CodeExecution, Star, Snippet, Follow } from '../models';
 import { catchAsync } from '../middleware/errorHandler';
 import { HTTP_STATUS, ERROR_CODES } from '../utils/constants';
 import { logger } from '../utils/logger';
@@ -7,6 +7,7 @@ import { validateObjectId, sanitizeSearchInput } from '../utils/sanitization';
 import { clearAuthCookie } from '../utils/cookies';
 import { parsePaginationParams, buildPaginationResponse } from '../utils/pagination';
 import { getUsersWithFollowCounts } from '../utils/userAggregations';
+import { cache, CACHE_TTL, cacheKeys } from '../utils/cache';
 
 /**
  * User controller handling user-related operations
@@ -248,6 +249,16 @@ export const getUserProfile = catchAsync(async (req: Request, res: Response): Pr
       .select('language executionTime output error createdAt')
       .lean();
 
+    // Check if user is authenticated and fetch follow status
+    let isFollowing = false;
+    if (req.user) {
+      try {
+        isFollowing = await Follow.isFollowing(req.user.id, validUserId);
+      } catch (error) {
+        logger.error('Failed to check follow status:', error);
+      }
+    }
+
     // Structure the enhanced profile response
     const enhancedProfile = {
       user: {
@@ -257,6 +268,7 @@ export const getUserProfile = catchAsync(async (req: Request, res: Response): Pr
         createdAt: userWithCounts.createdAt,
         followerCount: userWithCounts.followerCount || 0,
         followingCount: userWithCounts.followingCount || 0,
+        isFollowing: req.user ? isFollowing : undefined,
       },
       recentActivity: {
         snippets: recentSnippets,
@@ -465,8 +477,64 @@ export const getContributionGraph = catchAsync(async (req: Request, res: Respons
 
   try {
     // Parse date range (default: past 365 days)
-    const end = endDate ? new Date(endDate as string) : new Date();
-    const start = startDate ? new Date(startDate as string) : new Date(end.getTime() - 365 * 24 * 60 * 60 * 1000);
+    let end: Date;
+    let start: Date;
+    
+    // Validate end date
+    if (endDate) {
+      end = new Date(endDate as string);
+      if (isNaN(end.getTime())) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: {
+            message: 'Invalid end date format',
+            code: ERROR_CODES.VALIDATION_ERROR,
+          },
+        });
+        return;
+      }
+    } else {
+      end = new Date();
+    }
+    
+    // Validate start date
+    if (startDate) {
+      start = new Date(startDate as string);
+      if (isNaN(start.getTime())) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: {
+            message: 'Invalid start date format',
+            code: ERROR_CODES.VALIDATION_ERROR,
+          },
+        });
+        return;
+      }
+    } else {
+      start = new Date(end.getTime() - 365 * 24 * 60 * 60 * 1000);
+    }
+    
+    // Validate date range
+    if (start > end) {
+      res.status(HTTP_STATUS.BAD_REQUEST).json({
+        error: {
+          message: 'Start date must be before end date',
+          code: ERROR_CODES.VALIDATION_ERROR,
+        },
+      });
+      return;
+    }
+    
+    // Limit date range to prevent excessive data
+    const maxDaysRange = 730; // 2 years
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > maxDaysRange) {
+      res.status(HTTP_STATUS.BAD_REQUEST).json({
+        error: {
+          message: `Date range exceeds maximum allowed range of ${maxDaysRange} days`,
+          code: ERROR_CODES.VALIDATION_ERROR,
+        },
+      });
+      return;
+    }
 
     // Set times to start/end of day for consistency
     start.setHours(0, 0, 0, 0);
@@ -533,6 +601,100 @@ export const getContributionGraph = catchAsync(async (req: Request, res: Respons
     });
   } catch (error) {
     logger.error('Failed to get contribution graph:', error);
+    throw error;
+  }
+});
+
+/**
+ * Get popular users sorted by follower count
+ */
+export const getPopularUsers = catchAsync(async (req: Request, res: Response): Promise<void> => {
+  const { page, limit, skip } = parsePaginationParams(req);
+
+  try {
+    const cacheKey = cacheKeys.popularUsers(limit);
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData && cachedData.data) {
+      res.status(HTTP_STATUS.OK).json(cachedData);
+      return;
+    }
+
+    const users = await User.aggregate([
+      {
+        $lookup: {
+          from: 'follows',
+          localField: '_id',
+          foreignField: 'followingId',
+          as: 'followers'
+        }
+      },
+      {
+        $addFields: {
+          followerCount: { $size: '$followers' }
+        }
+      },
+      { $sort: { followerCount: -1 } },
+      { $skip: skip },
+      { $limit: limit }
+    ]);
+
+    if (users.length === 0) {
+      res.status(HTTP_STATUS.OK).json({
+        message: 'No popular users found',
+        data: []
+      });
+      return;
+    }
+
+    // Cache the results
+    await cache.set(cacheKey, users, CACHE_TTL.POPULAR_USERS);
+
+    const totalUsers = await User.countDocuments();
+    const response = buildPaginationResponse(users, totalUsers, page, limit);
+    await cache.set(cacheKey, response, CACHE_TTL.POPULAR_USERS);
+    res.status(HTTP_STATUS.OK).json(response);
+  } catch (error) {
+    logger.error('Failed to get popular users:', error);
+    throw error;
+  }
+});
+
+/**
+ * Get recent users sorted by registration date
+ */
+export const getRecentUsers = catchAsync(async (req: Request, res: Response): Promise<void> => {
+  const { page, limit, skip } = parsePaginationParams(req);
+
+  try {
+    const cacheKey = cacheKeys.recentUsers(limit);
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData && cachedData.data) {
+      res.status(HTTP_STATUS.OK).json(cachedData);
+      return;
+    }
+
+    const users = await User.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    if (users.length === 0) {
+      res.status(HTTP_STATUS.OK).json({
+        message: 'No recent users found',
+        data: []
+      });
+      return;
+    }
+
+    // Cache the results
+    await cache.set(cacheKey, users, CACHE_TTL.RECENT_USERS);
+
+    const totalUsers = await User.countDocuments();
+    const response = buildPaginationResponse(users, totalUsers, page, limit);
+    await cache.set(cacheKey, response, CACHE_TTL.RECENT_USERS);
+    res.status(HTTP_STATUS.OK).json(response);
+  } catch (error) {
+    logger.error('Failed to get recent users:', error);
     throw error;
   }
 });
