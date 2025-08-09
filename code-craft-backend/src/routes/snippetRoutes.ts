@@ -18,13 +18,11 @@ import {
   validatePagination,
   validateSearch,
 } from '../middleware/validation';
-import { snippetCreationLimiter, generalLimiter } from '../middleware/rateLimiting';
+import { snippetCreationLimiter } from '../middleware/rateLimiting';
 import { verifyCsrfToken } from '../middleware/csrf';
 
 const router = Router();
 
-// Apply general rate limiting to all snippet routes
-router.use(generalLimiter);
 
 // Create snippet (requires auth, rate limited)
 router.post(
