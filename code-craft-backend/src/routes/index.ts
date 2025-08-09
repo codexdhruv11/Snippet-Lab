@@ -55,10 +55,10 @@ router.get('/version', (req: Request, res: Response) => {
 // Mount route modules with appropriate prefixes and CSRF protection
 router.use('/auth', authRoutes);
 router.use('/users', verifyCsrfToken, userRoutes);
+router.use('/users', verifyCsrfToken, followRoutes); // Mount follow routes under /users
 router.use('/snippets', verifyCsrfToken, snippetRoutes);
 router.use('/comments', verifyCsrfToken, commentRoutes);
 router.use('/stars', verifyCsrfToken, starRoutes);
-router.use('/follows', verifyCsrfToken, followRoutes);
 router.use('/notifications', verifyCsrfToken, notificationRoutes);
 router.use('/executions', verifyCsrfToken, executionRoutes);
 router.use('/languages', executionRoutes); // For supported languages endpoint (read-only)
