@@ -68,7 +68,7 @@ const createApiClient = (): AxiosInstance => {
         const rateLimitExpiry = sessionStorage.getItem(rateLimitKey);
         const globalRateLimitExpiry = sessionStorage.getItem(globalRateLimitKey);
         
-        let effectiveExpiry = null;
+        let effectiveExpiry: number | null = null;
         if (rateLimitExpiry) {
           effectiveExpiry = parseInt(rateLimitExpiry, 10);
         }

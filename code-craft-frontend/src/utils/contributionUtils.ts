@@ -96,10 +96,14 @@ export function processContributionData(rawData: unknown): ContributionDay[] {
 
   return rawData
     .filter(isContributionData)
-    .map(item => ({
-      date: item.date,
-      count: Math.max(0, Math.floor(item.count)),
-    }));
+    .map(item => {
+      const count = Math.max(0, Math.floor(item.count));
+      return {
+        date: item.date,
+        count,
+        level: getContributionLevel(count)
+      };
+    });
 }
 
 /**
@@ -324,6 +328,7 @@ export function generateContributionGrid(
         week.push({
           date: dateStr,
           count,
+          level: getContributionLevel(count)
         });
       }
       
@@ -361,7 +366,7 @@ export interface ContributionStats {
   totalContributions: number;
   longestStreak: number;
   currentStreak: number;
-  bestDay: { date: string; count: number } | null;
+  bestDay?: { date: string; count: number };
 }
 
 export function calculateContributionStats(
@@ -374,7 +379,7 @@ export function calculateContributionStats(
       totalContributions: 0,
       longestStreak: 0,
       currentStreak: 0,
-      bestDay: null
+      bestDay: undefined
     };
   }
 
@@ -388,7 +393,7 @@ export function calculateContributionStats(
       totalContributions: 0,
       longestStreak: 0,
       currentStreak: 0,
-      bestDay: null
+      bestDay: undefined
     };
   }
   
@@ -446,6 +451,6 @@ export function calculateContributionStats(
     totalContributions,
     longestStreak,
     currentStreak,
-    bestDay: bestDay.count > 0 ? bestDay : null
+    bestDay: bestDay.count > 0 ? bestDay : undefined
   };
 }

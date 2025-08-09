@@ -3,15 +3,56 @@ import type { SearchResult, SearchFilters, SearchAnalyticsEvent } from '@/types/
 /**
  * Highlight search terms in text
  */
-export function highlightSearchTerms(text: string, searchTerms: string[]): string {
-  if (!text || searchTerms.length === 0) return text;
+export function highlightSearchTerms(text: string, searchTerms: string | string[]): { text: string; highlight: boolean }[] {
+  if (!text) return [{ text, highlight: false }];
   
-  const escapedTerms = searchTerms.map(term => 
-    term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  );
+  // Convert single string to array
+  const terms = Array.isArray(searchTerms) ? searchTerms : [searchTerms];
+  
+  if (terms.length === 0 || terms.every(term => !term)) {
+    return [{ text, highlight: false }];
+  }
+  
+  const escapedTerms = terms
+    .filter(term => term && term.length > 0)
+    .map(term => 
+      term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    );
+  
+  if (escapedTerms.length === 0) {
+    return [{ text, highlight: false }];
+  }
+  
   const regex = new RegExp(`(${escapedTerms.join('|')})`, 'gi');
+  const parts: { text: string; highlight: boolean }[] = [];
+  let lastIndex = 0;
+  let match;
   
-  return text.replace(regex, '<mark>$1</mark>');
+  while ((match = regex.exec(text)) !== null) {
+    // Add non-highlighted text before match
+    if (match.index > lastIndex) {
+      parts.push({
+        text: text.slice(lastIndex, match.index),
+        highlight: false
+      });
+    }
+    // Add highlighted match
+    parts.push({
+      text: match[1],
+      highlight: true
+    });
+    lastIndex = regex.lastIndex;
+  }
+  
+  // Add remaining non-highlighted text
+  if (lastIndex < text.length) {
+    parts.push({
+      text: text.slice(lastIndex),
+      highlight: false
+    });
+  }
+  
+  return parts.length > 0 ? parts : [{ text, highlight: false }];
 }
 
 /**
@@ -93,9 +134,9 @@ function calculateRelevanceScore(result: SearchResult, query: string): number {
     if (snippet.code.toLowerCase().includes(query)) score += 2;
   } else if (result.type === 'user') {
     const user = result.data;
-    if (user.username.toLowerCase() === query) score += 10;
-    if (user.username.toLowerCase().includes(query)) score += 5;
-    if (user.name?.toLowerCase().includes(query)) score += 3;
+    if (user.name?.toLowerCase() === query) score += 10;
+    if (user.name?.toLowerCase().includes(query)) score += 5;
+    if (user.bio?.toLowerCase().includes(query)) score += 3;
   } else if (result.type === 'tag') {
     const tag = result.data;
     if (tag.name.toLowerCase() === query) score += 10;

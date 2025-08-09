@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SearchResults } from "@/components/search/SearchResults";
-import { SearchFilters } from "@/components/search/SearchFilters";
+import SearchFilters from "@/components/search/SearchFilters";
 import { useSearch } from "@/hooks/useSearch";
 import { useSearchFilters } from "@/hooks/useSearchFilters";
 

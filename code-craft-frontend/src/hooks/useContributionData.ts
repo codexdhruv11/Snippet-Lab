@@ -31,6 +31,7 @@ interface UseContributionDataReturn {
     longestStreak: number;
     currentStreak: number;
     averagePerDay: number;
+    bestDay?: { date: string; count: number };
   } | null;
 }
 
@@ -98,7 +99,7 @@ export function useContributionData({
         throw error;
       }
     },
-    cacheTime,
+    gcTime: cacheTime,
     staleTime,
     retry: (failureCount, error: any) => {
       // Don't retry on rate limiting
@@ -125,10 +126,10 @@ export function useContributionData({
   const data = realtimeData || fetchedData || null;
 
   // Generate contribution grid from data
-  const grid = data ? generateContributionGrid(data, startDate, endDate) : [];
+  const grid = data && Array.isArray(data) ? generateContributionGrid(data, startDate, endDate) : [];
 
   // Calculate statistics
-  const stats = data ? calculateStats(data) : null;
+  const stats = data && Array.isArray(data) ? calculateStats(data) : null;
 
   // Invalidate cache
   const invalidate = useCallback(() => {
@@ -235,7 +236,7 @@ export function useContributionData({
   }, [refetch]);
 
   return {
-    data,
+    data: data && Array.isArray(data) ? data : null,
     grid,
     isLoading,
     isError,
@@ -253,6 +254,7 @@ function calculateStats(data: ContributionDay[]): {
   longestStreak: number;
   currentStreak: number;
   averagePerDay: number;
+  bestDay?: { date: string; count: number };
 } {
   const sortedData = [...data].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -262,6 +264,7 @@ function calculateStats(data: ContributionDay[]): {
   let longestStreak = 0;
   let currentStreak = 0;
   let tempStreak = 0;
+  let bestDay: { date: string; count: number } | undefined = undefined;
 
   for (let i = 0; i < sortedData.length; i++) {
     const day = sortedData[i];
@@ -269,6 +272,11 @@ function calculateStats(data: ContributionDay[]): {
 
     if (day.count > 0) {
       tempStreak++;
+      
+      // Track best day
+      if (!bestDay || day.count > bestDay.count) {
+        bestDay = { date: day.date, count: day.count };
+      }
       
       // Check if this is consecutive with previous day
       if (i > 0) {
@@ -305,5 +313,6 @@ function calculateStats(data: ContributionDay[]): {
     longestStreak,
     currentStreak,
     averagePerDay: Number(averagePerDay.toFixed(2)),
+    bestDay
   };
 }

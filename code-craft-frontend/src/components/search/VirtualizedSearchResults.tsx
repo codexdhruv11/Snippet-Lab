@@ -27,8 +27,7 @@ export const VirtualizedSearchResults: React.FC<VirtualizedSearchResultsProps> =
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   
-  const observerRef = useRef<HTMLDivElement>(null);
-  const entry = useIntersectionObserver(observerRef, {
+  const [observerRef, isIntersecting] = useIntersectionObserver({
     threshold: 0.1,
     rootMargin: '100px',
   });
@@ -46,7 +45,7 @@ export const VirtualizedSearchResults: React.FC<VirtualizedSearchResultsProps> =
 
   // Load more results when intersection observer triggers
   useEffect(() => {
-    if (entry?.isIntersecting && hasMore && !isLoadingMore) {
+    if (isIntersecting && hasMore && !isLoadingMore) {
       setIsLoadingMore(true);
       
       // Simulate async loading for smooth UX
@@ -59,7 +58,7 @@ export const VirtualizedSearchResults: React.FC<VirtualizedSearchResultsProps> =
         setIsLoadingMore(false);
       }, 300);
     }
-  }, [entry?.isIntersecting, hasMore, isLoadingMore, results, visibleResults.length, itemsPerBatch]);
+  }, [isIntersecting, hasMore, isLoadingMore, results, visibleResults.length, itemsPerBatch]);
 
   if (isLoading) {
     return (

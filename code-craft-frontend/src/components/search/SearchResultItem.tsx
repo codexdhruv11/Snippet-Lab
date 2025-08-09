@@ -28,9 +28,9 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({ result, onClick }) 
 function renderResultComponent(result: SearchResult) {
   switch (result.type) {
     case "snippet":
-      return <SnippetCard snippet={result.data} showAuthor showStats />;
+      return <SnippetCard snippet={result.data} />;
     case "user":
-      return <UserCard user={result.data} showStats />;
+      return <UserCard user={result.data} />;
     case "tag":
       return (
         <div className="p-2">
