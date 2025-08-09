@@ -26,7 +26,7 @@ export function UserCard({ user, showFollowButton = true, className }: UserCardP
   };
 
   return (
-    <Card className={`transition-all duration-200 hover:shadow-md ${className}`}>
+    <Card className={`transition-all duration-200 hover:shadow-md ${className}`} role="listitem">
       <CardContent className="p-4">
         <Link href={`/users/${user._id}`} className="block">
           <div className="flex items-start space-x-4">
@@ -44,7 +44,7 @@ export function UserCard({ user, showFollowButton = true, className }: UserCardP
                 <div className="flex-1 min-w-0">
                   {/* Name */}
                   <h3 className="text-sm font-semibold text-foreground truncate">
-                    {user.name}
+                    {user.name || 'Unknown User'}
                   </h3>
                   
                   {/* Bio */}
@@ -57,13 +57,13 @@ export function UserCard({ user, showFollowButton = true, className }: UserCardP
                   {/* Stats */}
                   <div className="flex items-center gap-3 mt-2">
                     {user.followerCount !== undefined && (
-                      <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs" aria-label="Follower count">
                         {user.followerCount} {user.followerCount === 1 ? 'follower' : 'followers'}
                       </Badge>
                     )}
                     
                     {user.followingCount !== undefined && (
-                      <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs" aria-label="Following count">
                         {user.followingCount} following
                       </Badge>
                     )}
@@ -71,8 +71,18 @@ export function UserCard({ user, showFollowButton = true, className }: UserCardP
                 </div>
 
                 {/* Follow Button */}
-                {showFollowButton && (
-                  <div className="ml-4" onClick={(e) => e.preventDefault()}>
+                {showFollowButton && user._id && (
+                <div 
+                  className="ml-4" 
+                  onClick={(e) => e.preventDefault()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }
+                  }}
+                  aria-label="Follow button container"
+                >
                     <FollowButton
                       userId={user._id}
                       initialFollowState={user.isFollowing}
