@@ -32,6 +32,7 @@ export const API_ENDPOINTS = {
   },
   TAGS: {
     POPULAR: '/snippets/tags/popular',
+    SEARCH: '/snippets/tags/search',
   },
   COMMENTS: {
     FOR_SNIPPET: (snippetId: string) => `/snippets/${snippetId}/comments`,
@@ -78,6 +79,15 @@ export const API_ENDPOINTS = {
   },
   WEBHOOKS: {
     HEALTH: '/webhooks/health',
+  },
+  SEARCH: {
+    GLOBAL: '/search',
+    SUGGESTIONS: '/search/suggestions',
+    ANALYTICS: {
+      TRACK: '/search/analytics/track',
+      GET: '/search/analytics',
+    },
+    POPULAR: '/search/popular',
   },
 };
 
@@ -158,6 +168,9 @@ export const API_LIMITS = {
   BIO_MAX_LENGTH: 500,
   EXECUTION_TIMEOUT: 30000, // 30 seconds
   MAX_USERS_PER_PAGE: 20, // Pagination limit for user lists
+  MAX_SNIPPETS_PER_PAGE: 20, // Pagination limit for snippets
+  MAX_TAGS_PER_PAGE: 50, // Pagination limit for tags
+  MAX_SEARCH_RESULTS: 20, // Search results per page
   MAX_TAGS_PER_SNIPPET: 10,
   MAX_TAG_LENGTH: 30,
   MIN_TAG_LENGTH: 2,
@@ -388,6 +401,41 @@ print(greet("SnippetLab"))
 // Array manipulation
 let numbers = (1...5).map { $0 * $0 }
 print("Squares: \\(numbers)")`
+};
+
+/**
+ * Search Constants
+ */
+export const SEARCH_ENDPOINTS = {
+  GLOBAL: '/search/global',
+  SUGGESTIONS: '/search/suggestions',
+  ANALYTICS: '/search/analytics',
+  HISTORY: '/search/history',
+  POPULAR: '/search/popular',
+};
+
+export const SEARCH_LIMITS = {
+  DEBOUNCE_DELAY: 300,
+  MIN_QUERY_LENGTH: 2,
+  MAX_HISTORY_ITEMS: 20,
+  MAX_SUGGESTIONS: 10,
+};
+
+export const SEARCH_ANALYTICS_EVENTS = {
+  SEARCH: 'search',
+  CLICK: 'click',
+  FILTER: 'filter',
+  CLEAR: 'clear',
+};
+
+export const SEARCH_CONFIG = {
+  debounceDelay: 300,
+  minQueryLength: 2,
+  maxHistoryItems: 20,
+  maxSuggestions: 10,
+  enableAnalytics: true,
+  enableHistory: true,
+  enableSuggestions: true,
 };
 
 /**
