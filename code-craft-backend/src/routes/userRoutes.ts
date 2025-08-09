@@ -12,13 +12,10 @@ import {
 } from '../controllers/userController';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { validateUserUpdate, validateObjectId, validatePasswordChange, validatePagination, validateUserSearch, validateContributionGraph } from '../middleware/validation';
-import { generalLimiter } from '../middleware/rateLimiting';
 import { verifyCsrfToken } from '../middleware/csrf';
 
 const router = Router();
 
-// Apply general rate limiting to all user routes
-router.use(generalLimiter);
 
 // User search (public with optional auth for enriched data)
 router.get('/search', optionalAuth, validateUserSearch, validatePagination, searchUsers);
