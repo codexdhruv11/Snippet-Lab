@@ -3,12 +3,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { debounce } from 'lodash';
+import { useDebounceCallback } from '@/hooks/useDebounceCallback';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { UserCard } from './UserCard';
@@ -17,6 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, UserX, Loader2 } from 'lucide-react';
 import { userSearchApi } from '@/lib/api';
+import type { UserSearchResult } from '@/types/api';
 
 interface UserSearchModalProps {
   isOpen: boolean;
@@ -30,12 +32,9 @@ export function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(-1);
 
   // Debounce search query
-  const debouncedSearch = useCallback(
-    debounce((query: string) => {
-      setDebouncedQuery(query);
-    }, 300),
-    []
-  );
+  const debouncedSearch = useDebounceCallback((query: string) => {
+    setDebouncedQuery(query);
+  }, 300);
 
   useEffect(() => {
     debouncedSearch(searchQuery);
@@ -77,7 +76,7 @@ export function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const users = data?.users || [];
+    const users = data?.data || [];
     
     switch (e.key) {
       case 'ArrowDown':
@@ -127,6 +126,9 @@ export function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Search Users</DialogTitle>
+          <DialogDescription>
+            Find and connect with other developers
+          </DialogDescription>
         </DialogHeader>
 
         {/* Search Input */}
@@ -172,14 +174,14 @@ export function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
                 )}
               </Button>
             </div>
-          ) : data?.users?.length === 0 ? (
+          ) : data?.data?.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               <UserX className="h-8 w-8 mx-auto mb-2" />
               <p>No users found matching "{searchQuery}"</p>
             </div>
           ) : (
             <div className="space-y-2" id="search-results" role="listbox">
-              {data?.users?.map((user: any, index: number) => (
+              {data?.data?.map((user: UserSearchResult, index: number) => (
                 <div
                   key={user._id}
                   onClick={() => handleUserClick(user._id)}
@@ -199,7 +201,7 @@ export function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
         </ScrollArea>
 
         {/* View All Results */}
-        {data?.users?.length > 0 && (
+        {data?.data?.length > 0 && (
           <div className="flex justify-center pt-2">
             <Button
               onClick={handleViewAllResults}
