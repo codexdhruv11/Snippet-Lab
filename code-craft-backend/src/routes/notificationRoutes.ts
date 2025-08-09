@@ -6,7 +6,7 @@ import {
   getUnreadCount,
 } from '../controllers/notificationController';
 import { requireAuth } from '../middleware/auth';
-import { notificationLimiter, generalLimiter } from '../middleware/rateLimiting';
+import { notificationLimiter } from '../middleware/rateLimiting';
 import {
   validatePagination,
   validateNotificationFetch,
@@ -38,7 +38,6 @@ router.get(
 router.get(
   '/unread-count',
   requireAuth,
-  generalLimiter,
   getUnreadCount
 );
 
@@ -51,7 +50,6 @@ router.patch(
   '/:id/read',
   requireAuth,
   validateMarkAsRead,
-  generalLimiter,
   markAsRead
 );
 
@@ -63,7 +61,6 @@ router.patch(
 router.patch(
   '/read-all',
   requireAuth,
-  generalLimiter,
   markAllAsRead
 );
 
