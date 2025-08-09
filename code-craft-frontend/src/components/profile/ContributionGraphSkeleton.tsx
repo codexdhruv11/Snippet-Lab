@@ -1,25 +1,59 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Calendar, Flame, Trophy } from 'lucide-react';
+import { getDefaultDateRange, getMonthLabels, getWeekdayLabels } from '@/utils/contributionUtils';
 
 interface ContributionGraphSkeletonProps {
   className?: string;
   showAnimation?: boolean;
-  variant?: 'default' | 'simple' | 'detailed';
+  variant?: 'default' | 'simple' | 'detailed' | 'mobile';
+  weeks?: number;
+  daysPerWeek?: number;
+  showStats?: boolean;
+  showLegend?: boolean;
 }
 
 export function ContributionGraphSkeleton({ 
   className,
   showAnimation = true,
-  variant = 'default' 
+  variant = 'default',
+  weeks: weekCount = 53,
+  daysPerWeek = 7,
+  showStats = true,
+  showLegend = true,
 }: ContributionGraphSkeletonProps) {
-  // Generate skeleton grid - 53 weeks x 7 days
-  const weeks = Array(53).fill(null);
-  const days = Array(7).fill(null);
+  // Check if reduced motion is preferred
+  const prefersReducedMotion = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+  
+  const shouldAnimate = showAnimation && !prefersReducedMotion;
+  
+  // Calculate responsive grid size based on variant
+  const responsiveWeeks = useMemo(() => {
+    switch (variant) {
+      case 'mobile':
+        return Math.min(weekCount, 12); // Show only 12 weeks on mobile
+      case 'simple':
+        return Math.min(weekCount, 26); // Show half year for simple variant
+      default:
+        return weekCount;
+    }
+  }, [variant, weekCount]);
+  
+  // Generate skeleton grid
+  const weeks = Array(responsiveWeeks).fill(null);
+  const days = Array(daysPerWeek).fill(null);
+  
+  // Get date range for month labels
+  const { startDate, endDate } = getDefaultDateRange();
+  const monthLabels = useMemo(() => getMonthLabels(startDate, endDate), [startDate, endDate]);
+  const weekdayLabels = useMemo(() => getWeekdayLabels(), []);
   
   // Animation variants
   const containerVariants = {
