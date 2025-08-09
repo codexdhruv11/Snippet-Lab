@@ -20,14 +20,12 @@ import {
   validateReplyCreation,
   validateThreadedComments,
 } from '../middleware/validation';
-import { commentLimiter, generalLimiter } from '../middleware/rateLimiting';
+import { commentLimiter } from '../middleware/rateLimiting';
 import { verifyCsrfToken } from '../middleware/csrf';
 import { createDepthAwareCommentLimiter } from '../middleware/depthAwareRateLimiter';
 
 const router = Router();
 
-// Apply general rate limiting to all comment routes
-router.use(generalLimiter);
 
 // Add comment to snippet (requires auth, rate limited)
 router.post(
