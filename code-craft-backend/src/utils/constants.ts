@@ -120,23 +120,23 @@ export const API_CONSTANTS = {
 export const RATE_LIMITS = {
   CODE_EXECUTION: {
     windowMs: 60 * 1000, // 1 minute
-    max: 10, // 10 requests per minute
+    max: process.env.NODE_ENV === 'development' ? 100 : 10, // 100 in dev, 10 in prod
   },
   SNIPPET_CREATION: {
     windowMs: 60 * 1000, // 1 minute
-    max: 5, // 5 requests per minute
+    max: process.env.NODE_ENV === 'development' ? 50 : 5, // 50 in dev, 5 in prod
   },
   COMMENT_CREATION: {
     windowMs: 60 * 1000, // 1 minute
-    max: 20, // 20 requests per minute
+    max: process.env.NODE_ENV === 'development' ? 200 : 20, // 200 in dev, 20 in prod
   },
   GENERAL_API: {
     windowMs: 60 * 1000, // 1 minute
-    max: 100, // 100 requests per minute
+    max: process.env.NODE_ENV === 'development' ? 1000 : 100, // 1000 in dev, 100 in prod
   },
   NOTIFICATION_FETCH: {
     windowMs: 60 * 1000, // 1 minute
-    max: 60, // 60 requests per minute
+    max: process.env.NODE_ENV === 'development' ? 600 : 60, // 600 in dev, 60 in prod
   },
 } as const;
 
