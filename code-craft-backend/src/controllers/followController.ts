@@ -177,7 +177,7 @@ export const getFollowers = catchAsync(
       const result = await FollowModel.getFollowers(userId, validPage, validLimit);
 
       res.status(HTTP_STATUS.OK).json({
-        followers: result.followers,
+        data: result.followers,
         pagination: {
           ...result.pagination,
           maxLimit, // Include max limit in response for transparency
