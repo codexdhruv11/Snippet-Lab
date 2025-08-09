@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserX, Loader2 } from 'lucide-react';
+import type { UserProfile, UserSearchResult } from '@/types/api';
 
 interface UserListProps {
-  users: any[];
+  users: (UserProfile | UserSearchResult)[];
   isLoading?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
@@ -93,7 +94,7 @@ export function UserList({
     <ScrollArea className={`h-full ${className}`}>
       <div className="space-y-4 pr-4">
         {/* User Cards Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" role="list" aria-label="User list">
           {users.map((user) => (
             <UserCard
               key={user._id}
@@ -111,6 +112,7 @@ export function UserList({
               disabled={isLoadingMore}
               variant="outline"
               size="sm"
+              aria-label="Load more users"
             >
               {isLoadingMore ? (
                 <>
