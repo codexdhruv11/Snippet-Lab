@@ -231,4 +231,8 @@ testsprite_tests/
 
 # Temporary development files
 tmp_rovodev_*
-changes.txt 
+changes.txt
+
+# Exclude text and markdown files
+*.txt
+*.md
