@@ -13,12 +13,10 @@ import {
   ContributionGraphResponse 
 } from '../types/api';
 
-// Store CSRF token in memory
+
 let csrfToken: string | null = null;
 
-/**
- * Clear CSRF token from memory
- */
+
 const clearCsrfToken = () => {
   csrfToken = null;
 };
@@ -58,6 +56,51 @@ const createApiClient = (): AxiosInstance => {
   // Request interceptor for logging and CSRF token
   api.interceptors.request.use(
     async (config) => {
+      // Check rate limiting before making request
+      if (typeof window !== 'undefined' && config.url) {
+        // Create a more specific rate limit key that includes method
+        const urlPath = config.url.replace(/\?.*$/, ''); // Remove query params
+        const method = config.method?.toUpperCase() || 'GET';
+        const rateLimitKey = `rateLimit_${method}_${urlPath}`;
+        const globalRateLimitKey = 'rateLimit_global';
+        
+        // Check endpoint-specific rate limit
+        const rateLimitExpiry = sessionStorage.getItem(rateLimitKey);
+        const globalRateLimitExpiry = sessionStorage.getItem(globalRateLimitKey);
+        
+        let effectiveExpiry = null;
+        if (rateLimitExpiry) {
+          effectiveExpiry = parseInt(rateLimitExpiry, 10);
+        }
+        if (globalRateLimitExpiry) {
+          const globalExpiry = parseInt(globalRateLimitExpiry, 10);
+          effectiveExpiry = effectiveExpiry ? Math.max(effectiveExpiry, globalExpiry) : globalExpiry;
+        }
+        
+        if (effectiveExpiry && Date.now() < effectiveExpiry) {
+          const waitTime = Math.ceil((effectiveExpiry - Date.now()) / 1000);
+          console.warn(`Rate limit active for ${method} ${urlPath}, wait ${waitTime}s`);
+          
+          // Don't block auth endpoints as they might be needed to recover
+          const isAuthEndpoint = config.url.includes('/auth/login') || 
+                                config.url.includes('/auth/register') || 
+                                config.url.includes('/csrf-token');
+          
+          if (!isAuthEndpoint) {
+            const error = new Error(`Rate limited. Please wait ${waitTime} seconds.`) as any;
+            error.response = { status: 429, data: { error: { retryAfter: waitTime } } };
+            error.isRateLimited = true;
+            error.config = config;
+            return Promise.reject(error);
+          }
+        } else if (effectiveExpiry) {
+          // Clean up expired rate limit
+          sessionStorage.removeItem(rateLimitKey);
+          if (Date.now() >= parseInt(globalRateLimitExpiry || '0', 10)) {
+            sessionStorage.removeItem(globalRateLimitKey);
+          }
+        }
+      }
       
       // Add CSRF token to headers for state-changing requests
       if (!['GET', 'HEAD', 'OPTIONS'].includes(config.method?.toUpperCase() || '')) {
@@ -75,8 +118,11 @@ const createApiClient = (): AxiosInstance => {
       // Add Authorization header if token exists in localStorage
       if (typeof window !== 'undefined') {
         const token = localStorage.getItem('token');
-        if (token) {
+        if (token && token !== 'undefined' && token !== 'null') {
           config.headers['Authorization'] = `Bearer ${token}`;
+        } else if (config.headers['Authorization']) {
+          // Remove invalid authorization header
+          delete config.headers['Authorization'];
         }
       }
       
@@ -92,19 +138,64 @@ const createApiClient = (): AxiosInstance => {
     (response) => {
       return response;
     },
-    (error) => {
+    async (error) => {
       // Handle common errors
       if (error.response) {
         // Rate limiting
         if (error.response.status === ERROR_CODES.RATE_LIMITED) {
-          toast.error('Rate limit exceeded. Please try again later.');
+          const retryAfter = error.response?.data?.error?.retryAfter || 
+                           error.response?.headers?.['retry-after'] || 
+                           60;
+          const message = `Rate limit exceeded. Please wait ${retryAfter} seconds before retrying.`;
+          toast.error(message);
+          
+          // Add retry-after to error for upstream handling
+          error.retryAfter = retryAfter;
+          error.isRateLimited = true;
+          
+          // Store rate limit info for automatic retry management
+          if (typeof window !== 'undefined' && error.config) {
+            // Store both endpoint-specific and global rate limits
+            const urlPath = error.config.url?.replace(/\?.*$/, '') || 'unknown';
+            const method = error.config.method?.toUpperCase() || 'GET';
+            const rateLimitKey = `rateLimit_${method}_${urlPath}`;
+            const expiresAt = Date.now() + (retryAfter * 1000);
+            sessionStorage.setItem(rateLimitKey, expiresAt.toString());
+            
+            // If it's a global rate limit (indicated by specific header or error message)
+            const isGlobalLimit = error.response?.data?.error?.global || 
+                                error.response?.headers?.['x-ratelimit-global'] === 'true';
+            if (isGlobalLimit) {
+              sessionStorage.setItem('rateLimit_global', expiresAt.toString());
+            }
+          }
         }
         
         // Authentication errors
         if (error.response.status === ERROR_CODES.UNAUTHORIZED) {
-          // Redirect to login if not already there
-          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-            window.location.href = '/login';
+          // Check if token was missing or invalid
+          const authHeader = error.config?.headers?.Authorization;
+          if (!authHeader || authHeader === 'Bearer undefined' || authHeader === 'Bearer null') {
+            console.warn('Request made without valid authentication token');
+            
+            // Try to get token from auth store if available
+            if (typeof window !== 'undefined') {
+              const token = localStorage.getItem('token');
+              if (token && token !== 'undefined' && token !== 'null') {
+                // Retry the request with the token
+                error.config.headers['Authorization'] = `Bearer ${token}`;
+                return api.request(error.config);
+              }
+            }
+          }
+          
+          // Clear invalid token and redirect to login
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            if (!window.location.pathname.includes('/login')) {
+              toast.error('Session expired. Please login again.');
+              window.location.href = '/login';
+            }
           }
         }
         
@@ -112,6 +203,13 @@ const createApiClient = (): AxiosInstance => {
         if (error.response.status === 403 && error.response.data?.error?.message?.includes('CSRF')) {
           clearCsrfToken();
           console.warn('CSRF token error, cleared token for retry');
+          
+          // Retry the request with new CSRF token
+          const newToken = await getCsrfToken();
+          if (newToken && error.config) {
+            error.config.headers['x-csrf-token'] = newToken;
+            return api.request(error.config);
+          }
         }
         
         // Server errors
