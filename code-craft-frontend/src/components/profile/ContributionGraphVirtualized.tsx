@@ -28,7 +28,7 @@ interface ContributionGraphVirtualizedProps {
     totalContributions: number;
     longestStreak: number;
     currentStreak: number;
-    bestDay?: { date: string; count: number };
+    bestDay?: { date: string; count: number } | undefined;
   } | null;
   thresholds?: ContributionThresholds;
   theme?: keyof typeof CONTRIBUTION_THEMES;
