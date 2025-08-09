@@ -8,13 +8,11 @@ import {
 } from '../controllers/starController';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { validateObjectId } from '../middleware/validation';
-import { starLimiter, generalLimiter } from '../middleware/rateLimiting';
+import { starLimiter } from '../middleware/rateLimiting';
 import { verifyCsrfToken } from '../middleware/csrf';
 
 const router = Router();
 
-// Apply general rate limiting to all star routes
-router.use(generalLimiter);
 
 // Toggle star on snippet (requires auth)
 router.post(
