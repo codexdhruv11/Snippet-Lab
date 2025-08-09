@@ -90,13 +90,16 @@ export function SnippetCard({ snippet, onClick, className }: SnippetCardProps) {
           <CardFooter className="px-4 py-3 border-t flex flex-col gap-3">
             <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <Link 
-                  href={`/users/${snippet.author?._id}`} 
-                  className="hover:text-foreground transition-colors"
-                  onClick={(e) => e.stopPropagation()}
+                <button
+                  className="hover:text-foreground transition-colors text-left"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    router.push(`/users/${snippet.author?._id}`);
+                  }}
                 >
                   <span className="hover:underline">By {userName}</span>
-                </Link>
+                </button>
                 {isAuthenticated && !isOwnSnippet && snippet.author?._id && (
                   <div onClick={(e) => e.stopPropagation()}>
                     <FollowButton 
