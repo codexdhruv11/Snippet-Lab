@@ -153,8 +153,9 @@ followSchema.statics.toggle = async function (
   followerId: string,
   followingId: string
 ): Promise<{ isFollowing: boolean; followerCount: number }> {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // Temporarily disabled transactions for debugging
+  // const session = await mongoose.startSession();
+  // session.startTransaction();
   const startTime = Date.now();
 
   try {
@@ -178,13 +179,13 @@ followSchema.statics.toggle = async function (
     }
 
     // First, check if the follow relationship exists
-    const existingFollow = await this.findOne({ followerId, followingId }).session(session);
+    const existingFollow = await this.findOne({ followerId, followingId });
     
     let isFollowing: boolean;
     
     if (existingFollow) {
       // Unfollow: Use findOneAndDelete for atomic deletion
-      await this.findOneAndDelete({ followerId, followingId }).session(session);
+      await this.findOneAndDelete({ followerId, followingId });
       isFollowing = false;
     } else {
       // Follow: Use findOneAndUpdate with upsert for atomic creation
@@ -192,36 +193,29 @@ followSchema.statics.toggle = async function (
       await this.findOneAndUpdate(
         { followerId, followingId },
         { $setOnInsert: { followerId, followingId } },
-        { upsert: true, new: true, session }
+        { upsert: true, new: true }
       );
       isFollowing = true;
     }
     
     // Get updated follower count
-    const followerCount = await this.countDocuments({ followingId }).session(session);
+    const followerCount = await this.countDocuments({ followingId });
 
-    await session.commitTransaction();
-    session.endSession();
+    // await session.commitTransaction();
+    // session.endSession();
     
     return { isFollowing, followerCount };
   } catch (error: any) {
-    await session.abortTransaction();
-    session.endSession();
+    // await session.abortTransaction();
+    // session.endSession();
 
     // Handle duplicate key error gracefully
     if (error.code === 11000) {
       // Follow relationship already exists, return current state
-      // Create a new session for the count query to ensure consistency
-      const countSession = await mongoose.startSession();
       try {
-        countSession.startTransaction();
-        const followerCount = await this.countDocuments({ followingId }).session(countSession);
-        await countSession.commitTransaction();
-        countSession.endSession();
+        const followerCount = await this.countDocuments({ followingId });
         return { isFollowing: true, followerCount };
       } catch (countError) {
-        await countSession.abortTransaction();
-        countSession.endSession();
         // If we can't get the count, throw the original error
         throw new FollowError('Failed to toggle follow relationship', 'TOGGLE_FOLLOW_ERROR', 500, {
           followerId,
