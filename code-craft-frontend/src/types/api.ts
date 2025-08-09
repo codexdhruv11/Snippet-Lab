@@ -198,11 +198,37 @@ export interface UpdateSnippetRequest {
 export interface PopularTagsResponse {
   data: TagData[];
   total: number;
-  meta?: {
-    source: 'cache' | 'db';
-    queryTime: number;
+}
+
+/**
+ * User search API response
+ */
+export interface UserSearchResponse {
+  data: UserSearchResult[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalItems: number;
+    hasMore: boolean;
   };
 }
+
+/**
+ * Followers/Following API response
+ */
+export interface FollowersResponse {
+  data: UserProfile[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalItems: number;
+    hasMore: boolean;
+  };
+}
+
+export interface FollowingResponse extends FollowersResponse {}
 
 /**
  * Contribution day data
