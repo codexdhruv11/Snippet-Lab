@@ -3,7 +3,7 @@
 import React, { useEffect, Suspense, useState, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { SearchResults } from '@/components/search/SearchResults';
-import { SearchFilters } from '@/components/search/SearchFilters';
+import SearchFilters from '@/components/search/SearchFilters';
 import { GlobalSearchBar } from '@/components/search/GlobalSearchBar';
 import { useSearch } from '@/hooks/useSearch';
 import { useSearchStore } from '@/stores/searchStore';
