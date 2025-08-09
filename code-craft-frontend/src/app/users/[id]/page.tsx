@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -30,10 +30,18 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
   const { user: currentUser } = useAuthStore();
   const [followersModalOpen, setFollowersModalOpen] = useState(false);
   const [followersModalTab, setFollowersModalTab] = useState<'followers' | 'following'>('followers');
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Redirect to own profile if viewing self
-  if (currentUser && currentUser._id === params.id) {
-    router.replace('/profile');
+  useEffect(() => {
+    if (currentUser && currentUser._id === params.id) {
+      setIsRedirecting(true);
+      router.replace('/profile');
+    }
+  }, [currentUser, params.id, router]);
+
+  // Early return if redirecting
+  if (isRedirecting) {
     return null;
   }
 
@@ -185,7 +193,12 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
 
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Calendar className="h-4 w-4" />
-                    <span>Joined {format(new Date(userProfile.createdAt), 'MMMM yyyy')}</span>
+                    <span>
+                      Joined{' '}
+                      {userProfile.createdAt && !isNaN(new Date(userProfile.createdAt).getTime())
+                        ? format(new Date(userProfile.createdAt), 'MMMM yyyy')
+                        : 'Recently'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -252,13 +265,15 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
         </Tabs>
 
         {/* Followers Modal */}
-        <FollowersModal
-          isOpen={followersModalOpen}
-          onClose={() => setFollowersModalOpen(false)}
-          userId={userProfile._id}
-          userName={userProfile.name}
-          initialTab={followersModalTab}
-        />
+        {userProfile && (
+          <FollowersModal
+            isOpen={followersModalOpen}
+            onClose={() => setFollowersModalOpen(false)}
+            userId={userProfile._id}
+            userName={userProfile.name}
+            initialTab={followersModalTab}
+          />
+        )}
       </div>
     </div>
   );
