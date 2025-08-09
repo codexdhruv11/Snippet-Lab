@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -12,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserList } from './UserList';
 import { followApi } from '@/lib/api';
 import { API_LIMITS } from '@/lib/constants';
+import type { UserProfile } from '@/types/api';
 
 interface FollowersModalProps {
   isOpen: boolean;
@@ -31,8 +33,8 @@ export function FollowersModal({
   const [activeTab, setActiveTab] = useState(initialTab);
   const [followersPage, setFollowersPage] = useState(1);
   const [followingPage, setFollowingPage] = useState(1);
-  const [allFollowers, setAllFollowers] = useState<any[]>([]);
-  const [allFollowing, setAllFollowing] = useState<any[]>([]);
+  const [allFollowers, setAllFollowers] = useState<UserProfile[]>([]);
+  const [allFollowing, setAllFollowing] = useState<UserProfile[]>([]);
 
   // Reset pages and data when modal opens or userId changes
   useEffect(() => {
@@ -49,10 +51,14 @@ export function FollowersModal({
     data: followersData,
     isLoading: isLoadingFollowers,
     isFetching: isFetchingMoreFollowers,
+    error: followersError,
+    refetch: refetchFollowers,
   } = useQuery({
     queryKey: ['followers', userId, followersPage],
     queryFn: () => followApi.getFollowers(userId, followersPage, API_LIMITS.MAX_USERS_PER_PAGE),
-    enabled: isOpen && activeTab === 'followers',
+    enabled: isOpen && activeTab === 'followers' && !!userId,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
 
   // Update accumulated followers when new data arrives
@@ -63,7 +69,7 @@ export function FollowersModal({
       } else {
         setAllFollowers(prev => {
           const newUsers = followersData.data.filter(
-            (user: any) => !prev.some((existing: any) => existing._id === user._id)
+            (user: UserProfile) => !prev.some((existing: UserProfile) => existing._id === user._id)
           );
           return [...prev, ...newUsers];
         });
@@ -76,10 +82,14 @@ export function FollowersModal({
     data: followingData,
     isLoading: isLoadingFollowing,
     isFetching: isFetchingMoreFollowing,
+    error: followingError,
+    refetch: refetchFollowing,
   } = useQuery({
     queryKey: ['following', userId, followingPage],
     queryFn: () => followApi.getFollowing(userId, followingPage, API_LIMITS.MAX_USERS_PER_PAGE),
-    enabled: isOpen && activeTab === 'following',
+    enabled: isOpen && activeTab === 'following' && !!userId,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
 
   // Update accumulated following when new data arrives
@@ -90,7 +100,7 @@ export function FollowersModal({
       } else {
         setAllFollowing(prev => {
           const newUsers = followingData.data.filter(
-            (user: any) => !prev.some((existing: any) => existing._id === user._id)
+            (user: UserProfile) => !prev.some((existing: UserProfile) => existing._id === user._id)
           );
           return [...prev, ...newUsers];
         });
@@ -115,6 +125,9 @@ export function FollowersModal({
       <DialogContent className="sm:max-w-2xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>{userName}'s Network</DialogTitle>
+          <DialogDescription>
+            View {userName}'s followers and the people they follow
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs
@@ -122,8 +135,8 @@ export function FollowersModal({
           onValueChange={(value) => setActiveTab(value as 'followers' | 'following')}
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="followers">
+          <TabsList className="grid w-full grid-cols-2" aria-label="User network tabs">
+            <TabsTrigger value="followers" aria-label="Followers tab">
               Followers
               {followersData?.pagination?.totalItems !== undefined && (
                 <span className="ml-2 text-xs text-muted-foreground">
@@ -131,7 +144,7 @@ export function FollowersModal({
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="following">
+            <TabsTrigger value="following" aria-label="Following tab">
               Following
               {followingData?.pagination?.totalItems !== undefined && (
                 <span className="ml-2 text-xs text-muted-foreground">
@@ -150,6 +163,9 @@ export function FollowersModal({
               isLoadingMore={isFetchingMoreFollowers && followersPage > 1}
               emptyMessage={`${userName} doesn't have any followers yet`}
               className="max-h-[50vh]"
+              error={followersError as Error | null}
+              onRetry={() => refetchFollowers()}
+              retryLoading={isFetchingMoreFollowers}
             />
           </TabsContent>
 
@@ -162,6 +178,9 @@ export function FollowersModal({
               isLoadingMore={isFetchingMoreFollowing && followingPage > 1}
               emptyMessage={`${userName} isn't following anyone yet`}
               className="max-h-[50vh]"
+              error={followingError as Error | null}
+              onRetry={() => refetchFollowing()}
+              retryLoading={isFetchingMoreFollowing}
             />
           </TabsContent>
         </Tabs>
