@@ -1,114 +1,215 @@
 import { format, eachDayOfInterval, startOfWeek, endOfWeek, getDay, getMonth, startOfYear, endOfYear, subDays, isValid } from 'date-fns';
+import type { ContributionDay } from '@/types/user';
 
-/**
- * Validate that a value is a valid number
- */
-function isValidNumber(value: any): value is number {
-  return typeof value === 'number' && !isNaN(value) && isFinite(value);
+// Memoization function to optimize computations
+function memoize<T extends (...args: any[]) => any>(fn: T): T {
+  const cache = new Map<string, ReturnType<T>>();
+  return ((...args: any[]) => {
+    const key = JSON.stringify(args);
+    if (!cache.has(key)) {
+      cache.set(key, fn(...args));
+    }
+    return cache.get(key)!;
+  }) as T;
 }
 
-/**
- * Validate that a date string or Date object is valid
- */
-function isValidDate(date: any): boolean {
-  if (!date) return false;
-  const dateObj = date instanceof Date ? date : new Date(date);
-  return isValid(dateObj) && !isNaN(dateObj.getTime());
-}
-
-/**
- * Get contribution level based on count (0-4)
- * 0 = no activity, 1 = low, 2 = medium, 3 = high, 4 = very high
- */
-export function getContributionLevel(count: number): number {
-  // Validate input
-  if (!isValidNumber(count) || count < 0) {
-    console.warn('Invalid count provided to getContributionLevel:', count);
-    return 0;
-  }
-  
-  // Ensure count is an integer
-  const safeCount = Math.floor(count);
-  
-  if (safeCount === 0) return 0;
-  if (safeCount <= 2) return 1;
-  if (safeCount <= 4) return 2;
-  if (safeCount <= 6) return 3;
-  return 4;
-}
-
-/**
- * Get CSS class for contribution level
- */
-export function getContributionColor(level: number): string {
-  // Validate input
-  if (!isValidNumber(level)) {
-    console.warn('Invalid level provided to getContributionColor:', level);
-    level = 0;
-  }
-  
-  // Clamp level between 0 and 4
-  const safeLevel = Math.max(0, Math.min(4, Math.floor(level)));
-  
-  const colors = {
+// Theme configuration
+export const CONTRIBUTION_THEMES = {
+  default: {
     0: 'bg-muted hover:bg-muted/80',
     1: 'bg-green-200 dark:bg-green-900 hover:bg-green-300 dark:hover:bg-green-800',
     2: 'bg-green-400 dark:bg-green-700 hover:bg-green-500 dark:hover:bg-green-600',
     3: 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-400',
     4: 'bg-green-800 dark:bg-green-300 hover:bg-green-900 dark:hover:bg-green-200',
-  };
-  return colors[safeLevel as keyof typeof colors] || colors[0];
+  },
+  highContrast: {
+    0: 'bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800',
+    1: 'bg-yellow-300 dark:bg-yellow-700 hover:bg-yellow-400 dark:hover:bg-yellow-600',
+    2: 'bg-orange-400 dark:bg-orange-600 hover:bg-orange-500 dark:hover:bg-orange-500',
+    3: 'bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-500',
+    4: 'bg-purple-700 dark:bg-purple-400 hover:bg-purple-800 dark:hover:bg-purple-300',
+  },
+  colorBlind: {
+    0: 'bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700',
+    1: 'bg-blue-200 dark:bg-blue-900 hover:bg-blue-300 dark:hover:bg-blue-800',
+    2: 'bg-blue-400 dark:bg-blue-700 hover:bg-blue-500 dark:hover:bg-blue-600',
+    3: 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-400',
+    4: 'bg-blue-800 dark:bg-blue-300 hover:bg-blue-900 dark:hover:bg-blue-200',
+  },
+  darkMode: {
+    0: 'bg-dark-50 dark:bg-dark-950 hover:bg-dark-100 dark:hover:bg-dark-900',
+    1: 'bg-dark-100 dark:bg-dark-850 hover:bg-dark-150 dark:hover:bg-dark-800',
+    2: 'bg-dark-200 dark:bg-dark-750 hover:bg-dark-250 dark:hover:bg-dark-700',
+    3: 'bg-dark-300 dark:bg-dark-650 hover:bg-dark-350 dark:hover:bg-dark-600',
+    4: 'bg-dark-400 dark:bg-dark-550 hover:bg-dark-450 dark:hover:bg-dark-500',
+  },
+} as const;
+
+type ContributionTheme = keyof typeof CONTRIBUTION_THEMES;
+type ContributionLevel = 0 | 1 | 2 | 3 | 4;
+
+/**
+ * Type guard for valid number
+ */
+function isValidNumber(value: unknown): value is number {
+  return typeof value === 'number' && !isNaN(value) && isFinite(value);
 }
 
 /**
- * Generate date range array
+ * Type guard for valid date
  */
-export function generateDateRange(startDate: Date, endDate: Date): Date[] {
-  // Validate inputs
+function isValidDate(date: unknown): boolean {
+  if (!date) return false;
+  const dateObj = date instanceof Date ? date : new Date(date as string);
+  return isValid(dateObj) && !isNaN(dateObj.getTime());
+}
+
+/**
+ * Type guard for contribution data
+ */
+export function isContributionData(data: unknown): data is ContributionDay {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'date' in data &&
+    'count' in data &&
+    typeof (data as any).date === 'string' &&
+    isValidNumber((data as any).count)
+  );
+}
+
+/**
+ * Validate contribution data array
+ */
+export function validateContributionData(data: unknown): data is ContributionDay[] {
+  return Array.isArray(data) && data.every(isContributionData);
+}
+
+/**
+ * Process raw contribution data with validation
+ */
+export function processContributionData(rawData: unknown): ContributionDay[] {
+  if (!Array.isArray(rawData)) {
+    console.error('Invalid contribution data format');
+    return [];
+  }
+
+  return rawData
+    .filter(isContributionData)
+    .map(item => ({
+      date: item.date,
+      count: Math.max(0, Math.floor(item.count)),
+    }));
+}
+
+/**
+ * Get contribution level based on count with customizable thresholds
+ */
+export function getContributionLevel(
+  count: number,
+  thresholds: number[] = [0, 1, 3, 5, 7]
+): ContributionLevel {
+  if (!isValidNumber(count) || count < 0) {
+    console.warn('Invalid count provided to getContributionLevel:', count);
+    return 0;
+  }
+  
+  const safeCount = Math.floor(count);
+  
+  for (let i = thresholds.length - 1; i >= 0; i--) {
+    if (safeCount >= thresholds[i]) {
+      return i as ContributionLevel;
+    }
+  }
+  
+  return 0;
+}
+
+/**
+ * Get CSS class for contribution level with theme support
+ */
+export function getContributionColor(
+  level: number,
+  theme: ContributionTheme = 'default'
+): string {
+  if (!isValidNumber(level)) {
+    console.warn('Invalid level provided to getContributionColor:', level);
+    level = 0;
+  }
+  
+  const safeLevel = Math.max(0, Math.min(4, Math.floor(level))) as ContributionLevel;
+  const themeColors = CONTRIBUTION_THEMES[theme] || CONTRIBUTION_THEMES.default;
+  
+  return themeColors[safeLevel];
+}
+
+// Cache for memoized date ranges
+const dateRangeCache = new Map<string, Date[]>();
+
+/**
+ * Generate date range array with memoization
+ */
+export const generateDateRange = memoize((startDate: Date, endDate: Date): Date[] => {
   if (!isValidDate(startDate) || !isValidDate(endDate)) {
     console.warn('Invalid dates provided to generateDateRange:', { startDate, endDate });
     return [];
   }
   
-  // Ensure startDate is before endDate
   if (startDate > endDate) {
     console.warn('Start date is after end date in generateDateRange');
     return [];
   }
   
   try {
-    return eachDayOfInterval({ start: startDate, end: endDate });
+    const dates = eachDayOfInterval({ start: startDate, end: endDate });
+    return dates;
   } catch (error) {
     console.error('Error generating date range:', error);
     return [];
   }
-}
+});
 
 /**
- * Format contribution tooltip text
+ * Format contribution tooltip text with customization
  */
-export function formatContributionTooltip(date: string | Date, count: number): string {
-  // Validate date
+export function formatContributionTooltip(
+  date: string | Date,
+  count: number,
+  options?: {
+    format?: string;
+    singular?: string;
+    plural?: string;
+    none?: string;
+  }
+): string {
   if (!isValidDate(date)) {
     console.warn('Invalid date provided to formatContributionTooltip:', date);
     return 'Invalid date';
   }
   
-  // Validate count
   if (!isValidNumber(count) || count < 0) {
     console.warn('Invalid count provided to formatContributionTooltip:', count);
     count = 0;
   }
   
+  const {
+    format: dateFormat = 'MMM d, yyyy',
+    singular = 'snippet',
+    plural = 'snippets',
+    none = 'No snippets',
+  } = options || {};
+  
   try {
     const dateObj = date instanceof Date ? date : new Date(date);
-    const formattedDate = format(dateObj, 'MMM d, yyyy');
+    const formattedDate = format(dateObj, dateFormat);
     const safeCount = Math.floor(count);
     
     if (safeCount === 0) {
-      return `No snippets on ${formattedDate}`;
+      return `${none} on ${formattedDate}`;
     }
-    return `${safeCount} snippet${safeCount !== 1 ? 's' : ''} on ${formattedDate}`;
+    
+    const label = safeCount === 1 ? singular : plural;
+    return `${safeCount} ${label} on ${formattedDate}`;
   } catch (error) {
     console.error('Error formatting contribution tooltip:', error);
     return 'Error formatting date';
@@ -166,76 +267,70 @@ export interface ContributionWeek {
 }
 
 export function generateContributionGrid(
-  data: Array<{ date: string; count: number }>,
-  startDate: Date,
-  endDate: Date
-): ContributionWeek[] {
-  // Validate inputs
-  if (!Array.isArray(data)) {
+  data: ContributionDay[],
+  startDate?: string | Date,
+  endDate?: string | Date
+): ContributionDay[][] {
+  // Use default date range if not provided
+  const dateRange = startDate && endDate
+    ? {
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+      }
+    : getDefaultDateRange();
+  
+  if (!validateContributionData(data)) {
     console.warn('Invalid data provided to generateContributionGrid');
-    data = [];
+    return [];
   }
   
-  if (!isValidDate(startDate) || !isValidDate(endDate)) {
+  if (!isValidDate(dateRange.startDate) || !isValidDate(dateRange.endDate)) {
     console.warn('Invalid dates provided to generateContributionGrid');
     return [];
   }
   
-  if (startDate > endDate) {
+  if (dateRange.startDate > dateRange.endDate) {
     console.warn('Start date is after end date in generateContributionGrid');
     return [];
   }
   
-  // Validate and filter data
-  const validData = data.filter(item => {
-    if (!item || typeof item.date !== 'string' || !isValidNumber(item.count)) {
-      console.warn('Invalid data item in generateContributionGrid:', item);
-      return false;
+  // Create optimized lookup map
+  const dataMap = new Map<string, number>();
+  data.forEach(item => {
+    if (isValidDate(item.date) && item.count >= 0) {
+      dataMap.set(item.date, Math.floor(item.count));
     }
-    return isValidDate(item.date) && item.count >= 0;
   });
   
-  // Create a map for quick lookup
-  const dataMap = new Map(validData.map(item => [item.date, Math.floor(item.count)]));
-  
   try {
-    // Adjust start date to beginning of week (Sunday)
-    const adjustedStartDate = startOfWeek(startDate, { weekStartsOn: 0 });
-    
-    // Adjust end date to end of week (Saturday)
-    const adjustedEndDate = endOfWeek(endDate, { weekStartsOn: 0 });
+    // Adjust dates to week boundaries
+    const adjustedStartDate = startOfWeek(dateRange.startDate, { weekStartsOn: 0 });
+    const adjustedEndDate = endOfWeek(dateRange.endDate, { weekStartsOn: 0 });
   
-    // Generate all dates
+    // Generate all dates with memoization
     const allDates = generateDateRange(adjustedStartDate, adjustedEndDate);
     
-    // Group by weeks
-    const weeks: ContributionWeek[] = [];
-    let currentWeek: ContributionWeek = { days: [] };
+    // Create 2D array grid
+    const grid: ContributionDay[][] = [];
     
-    allDates.forEach((date) => {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const count = dataMap.get(dateStr) || 0;
-      const level = getContributionLevel(count);
+    for (let i = 0; i < allDates.length; i += 7) {
+      const week: ContributionDay[] = [];
       
-      currentWeek.days.push({
-        date: dateStr,
-        count,
-        level
-      });
-      
-      // If we've completed a week (7 days), start a new one
-      if (currentWeek.days.length === 7) {
-        weeks.push(currentWeek);
-        currentWeek = { days: [] };
+      for (let j = 0; j < 7 && i + j < allDates.length; j++) {
+        const date = allDates[i + j];
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const count = dataMap.get(dateStr) || 0;
+        
+        week.push({
+          date: dateStr,
+          count,
+        });
       }
-    });
-    
-    // Add any remaining days
-    if (currentWeek.days.length > 0) {
-      weeks.push(currentWeek);
+      
+      grid.push(week);
     }
     
-    return weeks;
+    return grid;
   } catch (error) {
     console.error('Error generating contribution grid:', error);
     return [];
@@ -243,11 +338,18 @@ export function generateContributionGrid(
 }
 
 /**
- * Get default date range (last 365 days)
+ * Get default date range with timezone support
  */
-export function getDefaultDateRange(): { startDate: Date; endDate: Date } {
+export function getDefaultDateRange(options?: {
+  days?: number;
+  timezone?: string;
+}): { startDate: Date; endDate: Date } {
+  const { days = 365, timezone } = options || {};
+  
   const endDate = new Date();
-  const startDate = subDays(endDate, 364); // 365 days including today
+  const startDate = subDays(endDate, days - 1); // Include today
+  
+  // TODO: Add timezone conversion if needed
   
   return { startDate, endDate };
 }
