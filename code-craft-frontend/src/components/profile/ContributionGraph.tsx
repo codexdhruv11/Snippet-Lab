@@ -230,8 +230,7 @@ function ContributionGraphContent({
 
   // Safely extract contribution data with validation
   const contributionData = useMemo(() => {
-    const data = contributionDataFromHook || (Array.isArray(effectiveData?.data) ? effectiveData.data : 
-                          Array.isArray(effectiveData) ? effectiveData : []);
+    const data = contributionDataFromHook || (Array.isArray(effectiveData) ? effectiveData : []);
     return data.filter(item => {
       if (!item || typeof item !== 'object') return false;
       if (typeof item.date !== 'string' || !item.date) return false;
@@ -249,13 +248,12 @@ function ContributionGraphContent({
     );
     
     // Apply custom thresholds to contribution levels
-    return rawGrid.map(week => ({
-      ...week,
-      days: week.days.map(day => ({
+    return rawGrid.map(week => 
+      week.map(day => ({
         ...day,
         level: getContributionLevel(day.count)
       }))
-    }));
+    );
   }, [gridFromHook, contributionData, startDate, endDate, getContributionLevel]);
 
   // Calculate stats
@@ -342,7 +340,7 @@ function ContributionGraphContent({
         if (e.ctrlKey) {
           // Go to last day
           newWeek = contributionGrid.length - 1;
-          newDay = contributionGrid[newWeek].days.length - 1;
+          newDay = contributionGrid[newWeek].length - 1;
         } else {
           // Go to end of current week
           newWeek = weekIndex;
@@ -361,7 +359,7 @@ function ContributionGraphContent({
       case ' ':
         // Trigger click event
         e.preventDefault();
-        const day = contributionGrid[weekIndex].days[dayIndex];
+        const day = contributionGrid[weekIndex][dayIndex];
         if (onContributionClick) {
           onContributionClick(day.date, day.count);
         }
@@ -381,7 +379,7 @@ function ContributionGraphContent({
     
     // Announce to screen readers
     if (newSquare) {
-      const day = contributionGrid[newWeek].days[newDay];
+      const day = contributionGrid[newWeek][newDay];
       const announcement = formatContributionTooltip(day.date, day.count);
       // Use aria-live region for announcement (would need to add this)
     }
@@ -485,7 +483,7 @@ function ContributionGraphContent({
               <div className="flex gap-[3px]" ref={gridRef}>
                 {contributionGrid.map((week, weekIndex) => (
                   <div key={weekIndex} className="flex flex-col gap-[3px]">
-                    {week.days.map((day, dayIndex) => (
+                    {week.map((day, dayIndex) => (
                       <Tooltip key={`${weekIndex}-${dayIndex}`}>
                         <TooltipTrigger asChild>
                           <motion.div
