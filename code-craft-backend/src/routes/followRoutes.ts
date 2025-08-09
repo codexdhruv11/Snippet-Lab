@@ -9,7 +9,6 @@ import {
 } from '../controllers/followController';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { validateObjectId } from '../middleware/validation';
-import { generalLimiter } from '../middleware/rateLimiting';
 
 const router = Router();
 
@@ -18,10 +17,9 @@ const router = Router();
 
 // Toggle follow/unfollow - requires authentication
 router.post(
-  '/users/:id/follows',
+  '/:id/follows',
   requireAuth,
   validateObjectId('id'),
-  generalLimiter,
   toggleFollow
 );
 
@@ -29,7 +27,6 @@ router.post(
 router.get(
   '/:id/followers/count',
   validateObjectId('id'),
-  generalLimiter,
   getFollowerCount
 );
 
@@ -37,34 +34,30 @@ router.get(
 router.get(
   '/:id/following/count',
   validateObjectId('id'),
-  generalLimiter,
   getFollowingCount
 );
 
 // Check if current user follows target user - requires authentication
 router.get(
-  '/users/:id/follows/me',
+  '/:id/follows/me',
   requireAuth,
   validateObjectId('id'),
-  generalLimiter,
   isFollowing
 );
 
 // Get paginated list of followers - optional authentication
 router.get(
-  '/users/:id/followers',
+  '/:id/followers',
   optionalAuth,
   validateObjectId('id'),
-  generalLimiter,
   getFollowers
 );
 
 // Get paginated list of following - optional authentication
 router.get(
-  '/users/:id/following',
+  '/:id/following',
   optionalAuth,
   validateObjectId('id'),
-  generalLimiter,
   getFollowing
 );
 
