@@ -1,0 +1,296 @@
+/* ContributionGraph CSS Module */
+
+/* CSS Custom Properties for Theme Support */
+:root {
+  /* Default theme colors */
+--contribution-level-0: #e1e4e8; /* fallback */
+--contribution-level-1: #9be9a8; /* fallback */
+--contribution-level-2: #40c463; /* fallback */
+--contribution-level-3: #30a14e; /* fallback */
+--contribution-level-4: #216e39; /* fallback */
+  
+  /* Dark theme colors */
+  --contribution-level-0-dark: #161b22;
+  --contribution-level-1-dark: #0e4429;
+  --contribution-level-2-dark: #006d32;
+  --contribution-level-3-dark: #26a641;
+  --contribution-level-4-dark: #39d353;
+  
+  /* Animation timings */
+  --contribution-animation-duration: 0.3s;
+  --contribution-animation-timing: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Sizes */
+  --contribution-square-size: 11px;
+  --contribution-square-gap: 3px;
+  --contribution-border-radius: 2px;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  :root {
+    --contribution-level-0: #ffffff;
+    --contribution-level-1: #ffff00;
+    --contribution-level-2: #ff9900;
+    --contribution-level-3: #ff0000;
+    --contribution-level-4: #990099;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --contribution-level-0: var(--contribution-level-0-dark);
+    --contribution-level-1: var(--contribution-level-1-dark);
+    --contribution-level-2: var(--contribution-level-2-dark);
+    --contribution-level-3: var(--contribution-level-3-dark);
+    --contribution-level-4: var(--contribution-level-4-dark);
+  }
+}
+
+/* Container optimizations */
+.contribution-graph-container {
+  contain: layout style paint;
+  will-change: transform;
+}
+
+/* Grid layout */
+.contribution-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, var(--contribution-square-size));
+  gap: var(--contribution-square-gap);
+}
+
+/* Square styles with GPU acceleration */
+.contribution-square {
+  width: var(--contribution-square-size);
+  height: var(--contribution-square-size);
+  border-radius: var(--contribution-border-radius);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: 
+    transform var(--contribution-animation-duration) var(--contribution-animation-timing),
+    box-shadow var(--contribution-animation-duration) var(--contribution-animation-timing);
+}
+
+/* Hover effects */
+.contribution-square:hover {
+  transform: scale(1.2) translateZ(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+/* Focus styles for accessibility */
+.contribution-square:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  z-index: 20;
+}
+
+/* Animation optimization */
+.contribution-square-animated {
+  animation: contributionPop 0.4s var(--contribution-animation-timing) backwards;
+}
+
+@keyframes contributionPop {
+  0% {
+    transform: scale(0) translateZ(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1) translateZ(0);
+  }
+  100% {
+    transform: scale(1) translateZ(0);
+    opacity: 1;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .contribution-square {
+    transition: none;
+    animation: none;
+  }
+  
+  .contribution-square-animated {
+    animation: none;
+    opacity: 1;
+    transform: scale(1) translateZ(0);
+  }
+}
+
+/* Mobile responsive styles */
+@media (max-width: 640px) {
+  :root {
+    --contribution-square-size: 9px;
+    --contribution-square-gap: 2px;
+  }
+  
+  .contribution-grid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .contribution-graph-stats {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+/* Tablet responsive styles */
+@media (min-width: 641px) and (max-width: 1024px) {
+  :root {
+    --contribution-square-size: 10px;
+    --contribution-square-gap: 2.5px;
+  }
+}
+
+/* Loading skeleton animation */
+.contribution-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(0, 0, 0, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Dark mode skeleton */
+.dark .contribution-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+}
+
+/* Stats card styles */
+.contribution-stats-card {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.contribution-stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Legend styles */
+.contribution-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.contribution-legend-square {
+  width: var(--contribution-square-size);
+  height: var(--contribution-square-size);
+  border-radius: var(--contribution-border-radius);
+}
+
+/* Month label positioning */
+.contribution-month-label {
+  position: absolute;
+  font-size: 0.625rem;
+  color: var(--muted-foreground);
+  user-select: none;
+}
+
+/* Weekday label styles */
+.contribution-weekday-label {
+  font-size: 0.625rem;
+  color: var(--muted-foreground);
+  user-select: none;
+  text-align: right;
+  padding-right: 0.25rem;
+}
+
+/* Virtualized grid optimizations */
+.contribution-virtualized-grid {
+  contain: strict;
+  overflow: hidden;
+}
+
+.contribution-virtualized-cell {
+  position: absolute;
+  contain: layout style paint;
+}
+
+/* Print styles */
+@media print {
+  .contribution-graph-container {
+    break-inside: avoid;
+  }
+  
+  .contribution-square:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  
+  .contribution-skeleton {
+    animation: none;
+  }
+}
+
+/* Accessibility improvements */
+.contribution-graph-container:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: 0.5rem;
+}
+
+/* Screen reader only text */
+.contribution-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Tooltip optimizations */
+.contribution-tooltip {
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* Error state styles */
+.contribution-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: var(--destructive);
+}
+
+.contribution-error-icon {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.8;
+}
